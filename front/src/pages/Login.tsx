@@ -1,26 +1,39 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Button, Input } from "antd";
+import { Button, Input, message } from "antd";
 import {
   ThunderboltFilled,
   MailOutlined,
   LockOutlined,
   ArrowRightOutlined,
 } from "@ant-design/icons";
+import { apiClient } from "../api/client";
 import "./Login.css";
 
-// No backend yet — any credentials just simulate a session and continue
-// to the admin dashboard (see Module 1 · Authentification in the cahier des charges).
 function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("admin@bornelect.tn");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setLoading(true);
-    setTimeout(() => navigate("/dashboard"), 500);
+
+    try {
+      const { data } = await apiClient.post("/auth/login", { email, password });
+      localStorage.setItem("auth_token", data.token);
+      message.success("Connexion réussie");
+      navigate("/dashboard");
+    } catch (error: unknown) {
+      const responseMessage =
+        error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data
+          ? String(error.response.data.message)
+          : "Échec de la connexion";
+      message.error(responseMessage);
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (

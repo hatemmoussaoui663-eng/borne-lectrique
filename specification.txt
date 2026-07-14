@@ -1,0 +1,398 @@
+Cahier des Charges Fonctionnel 
+Développement d'une plateforme Web de Gestion des Bornes de 
+Recharge Électrique Connectées 
+Version 1.0 
+1. Présentation du projet 
+1.1 Contexte 
+Dans le cadre du développement de la mobilité électrique, le présent projet vise à développer 
+une plateforme web centralisée permettant la supervision, l'administration et la gestion d'un 
+réseau de bornes de recharge électriques connectées. 
+La plateforme permettra de gérer l'ensemble des opérations relatives aux bornes de recharge : 
+● supervision en temps réel 
+● gestion des utilisateurs 
+● suivi des sessions de recharge 
+● gestion des paiements 
+● maintenance 
+● statistiques 
+● alertes 
+Le système sera accessible depuis une interface Web responsive. 
+2. Objectifs 
+Les principaux objectifs sont : 
+● Centraliser la gestion des bornes. 
+● Superviser les bornes en temps réel. 
+● Réduire les temps d'intervention. 
+● Améliorer le taux de disponibilité. 
+● Fournir des tableaux de bord décisionnels. 
+● Permettre une intégration avec une application mobile. 
+● Être compatible avec le protocole OCPP. 
+3. Technologies retenues 
+Backend 
+● Laravel 12 
+● PHP 8.3 
+● REST API 
+● JWT Authentication 
+● Redis 
+● Queue Jobs 
+● Scheduler 
+Frontend 
+● React 
+● Ant Design 
+● Typescript 
+● Axios 
+● React Query 
+● ECharts 
+Base de données 
+● PostgreSQL 
+ou 
+● MySQL 8 
+Temps réel 
+● WebSocket 
+● Laravel Reverb 
+ou 
+● Pusher 
+Cartographie 
+● Google Maps 
+ou 
+● OpenStreetMap 
+Communication Bornes 
+● OCPP 1.6 
+● OCPP 2.0.1 
+4. Architecture générale 
+Bornes électriques 
+│ 
+OCPP 
+│ 
+Serveur OCPP 
+│ 
+REST API Laravel 
+│ 
+Base de données 
+│ 
+Frontend React Ant Design 
+5. Modules fonctionnels 
+Module 1 
+Authentification 
+Fonctionnalités 
+● Connexion 
+● Déconnexion 
+● Double authentification 
+● Réinitialisation mot de passe 
+● Gestion des rôles 
+Exemples de rôles 
+● Super Administrateur 
+● Exploitant 
+● Opérateur 
+● Technicien 
+● Service Client 
+● Finance 
+● Client 
+Module 2 
+Gestion des bornes 
+Une borne possède : 
+● Nom 
+● Référence 
+● Numéro série 
+● Modèle 
+● Fabricant 
+● Adresse 
+● Coordonnées GPS 
+● Version firmware 
+● Version OCPP 
+● Nombre de connecteurs 
+● Puissance 
+● Etat 
+Etat possible 
+● Disponible 
+● Occupée 
+● Hors service 
+● Maintenance 
+● Déconnectée 
+● Défaut 
+Fonctionnalités 
+● Ajouter 
+● Modifier 
+● Désactiver 
+● Géolocaliser 
+● Historique 
+● Affectation 
+Module 3 
+Gestion des connecteurs 
+Chaque borne peut contenir plusieurs connecteurs. 
+Informations 
+● Type 
+● CCS 
+● Type2 
+● CHAdeMO 
+● AC 
+● DC 
+Puissance 
+Etat 
+Disponibilité 
+Module 4 
+Supervision Temps Réel 
+Vue Dashboard 
+Affichage : 
+Carte interactive 
+Liste des bornes 
+Etat 
+Occupation 
+Température 
+Connexion 
+Dernier heartbeat 
+Temps restant 
+Alertes 
+Mises à jour automatiques 
+Module 5 
+Sessions de recharge 
+Gestion complète 
+Création 
+Début 
+Pause 
+Fin 
+Annulation 
+Informations 
+Utilisateur 
+Véhicule 
+Borne 
+Connecteur 
+Date début 
+Date fin 
+Durée 
+Energie consommée 
+Prix 
+Etat 
+Module 6 
+Gestion des utilisateurs 
+Clients 
+Techniciens 
+Exploitants 
+Administrateurs 
+Historique 
+Abonnements 
+Badges RFID 
+QRCode 
+Module 7 
+Gestion RFID 
+Association badge 
+Activation 
+Blocage 
+Expiration 
+Historique 
+Module 8 
+Gestion des véhicules 
+Marque 
+Modèle 
+Immatriculation 
+Type connecteur 
+Capacité batterie 
+Historique recharges 
+Module 9 
+Paiement 
+Paiement carte bancaire 
+Wallet 
+Abonnement 
+Paiement différé 
+Factures PDF 
+Historique 
+Remboursement 
+Module 10 
+Tarification 
+Tarifs 
+Par minute 
+Par kWh 
+Par heure 
+Par puissance 
+Heures pleines 
+Heures creuses 
+Tarifs spéciaux 
+Module 11 
+Maintenance 
+Planification 
+Ordres de travail 
+Pannes 
+Historique 
+Pièces remplacées 
+Interventions 
+Commentaires 
+Photos 
+Module 12 
+Alertes 
+Alertes automatiques 
+● Borne déconnectée 
+● Défaut matériel 
+● Surchauffe 
+● Coupure électrique 
+● Porte ouverte 
+● Erreur OCPP 
+Notifications 
+Email 
+SMS 
+Push 
+Module 13 
+Gestion Firmware 
+Téléversement 
+Déploiement 
+Historique 
+Version 
+Rollback 
+Module 14 
+Rapports 
+Consommation 
+CA 
+Utilisation 
+Disponibilité 
+Top bornes 
+Top clients 
+Maintenance 
+Export 
+PDF 
+Excel 
+CSV 
+Module 15 
+Tableau de bord 
+KPIs 
+Nombre de bornes 
+Bornes actives 
+Bornes indisponibles 
+Sessions aujourd'hui 
+CA 
+kWh délivrés 
+Temps moyen recharge 
+Carte temps réel 
+Module 16 
+Gestion documentaire 
+Notice 
+Photos 
+Contrats 
+Plans 
+Garanties 
+Module 17 
+Paramétrage 
+Paramètres système 
+TVA 
+Tarifs 
+Logo 
+Emails 
+SMS 
+Fuseaux horaires 
+Langues 
+Module 18 
+Journal d'audit 
+Connexion 
+Modification 
+Suppression 
+Export 
+Traçabilité complète 
+6. Communication avec les bornes 
+Messages OCPP 
+Heartbeat 
+Authorize 
+BootNotification 
+StartTransaction 
+StopTransaction 
+MeterValues 
+StatusNotification 
+RemoteStartTransaction 
+RemoteStopTransaction 
+ChangeConfiguration 
+UpdateFirmware 
+Reset 
+UnlockConnector 
+GetDiagnostics 
+DiagnosticsStatusNotification 
+FirmwareStatusNotification 
+7. Gestion des droits 
+Matrice des permissions complète. 
+Exemple : 
+Module 
+Bornes 
+Maintenance 
+Paiement 
+Admin 
+✔ 
+✔ 
+✔ 
+Exploitant 
+✔ 
+✔ 
+✔ 
+Technicien 
+Lecture 
+✔ 
+Non 
+Client 
+Lecture 
+Non 
+Lecture 
+8. Interfaces attendues 
+● Dashboard 
+● Carte GIS 
+● Liste bornes 
+● Détail borne 
+● Planning maintenance 
+● Sessions 
+● Facturation 
+● Rapports 
+● Paramètres 
+9. Exigences non fonctionnelles 
+Performance 
+● < 2 secondes par page 
+Disponibilité 
+● 99,9 % 
+Sécurité 
+● HTTPS 
+● JWT 
+● OAuth2 
+● RBAC 
+● Journalisation 
+● Chiffrement 
+Responsive 
+Compatible : 
+● PC 
+● Tablette 
+Navigateurs 
+● Chrome 
+● Firefox 
+● Edge 
+10. Livrables 
+● Cahier des charges 
+● Maquettes UI 
+● Architecture technique 
+● API REST 
+● Code source 
+● Documentation 
+● Manuel utilisateur 
+● Manuel administrateur 
+● Cahier de tests 
+● Procès-verbal de recette 
+Plateformes de référence 
+Ces solutions peuvent servir de référence fonctionnelle et ergonomique : 
+● ChargeLab : plateforme SaaS orientée opérateurs de réseaux de recharge (CPO) avec 
+supervision, gestion OCPP, tarification et API. 
+● AMPECO : plateforme complète en marque blanche pour la gestion des réseaux de 
+recharge, incluant OCPP, facturation, gestion des utilisateurs et supervision. 
+● Driivz : solution entreprise pour la supervision en temps réel, l'équilibrage de charge, la 
+maintenance et les analyses. 
+● ChargePoint : opérateur majeur proposant des interfaces d'administration et de gestion 
+des stations. 
+● EVBox avec sa plateforme Everon : gestion des bornes, supervision, maintenance et 
+reporting. 
+● Monta : plateforme moderne mettant l'accent sur l'expérience utilisateur, les paiements 
+et le partage de bornes. 
+Recommandation d'architecture 
+Pour un projet professionnel et évolutif, je recommande de découper la solution en plusieurs 
+composants : 
+● Backend métier : Laravel (API REST, gestion des utilisateurs, sessions, paiements, 
+reporting). 
+● Serveur OCPP dédié : gestion des communications bidirectionnelles avec les bornes 
+(WebSocket/OCPP 1.6J ou 2.0.1), indépendant du backend métier pour améliorer la 
+scalabilité. 
+● Frontend : React + Ant Design + TypeScript. 
+● Base de données : PostgreSQL. 
+● Cache et files d'attente : Redis. 
+● Temps réel : Laravel Reverb ou WebSockets. 
+● Cartographie : OpenStreetMap ou Google Maps. 
+● Authentification : Laravel Sanctum ou JWT. 
+Cette architecture facilite l'ajout futur d'une application mobile, l'intégration avec des systèmes 
+de paiement, des ERP ou des plateformes de Smart City, ainsi que la gestion de plusieurs milliers 
+de bornes connectées. 

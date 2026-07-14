@@ -1,12 +1,40 @@
+import { useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router-dom'
-import { Tabs, Button } from 'antd'
+import { Tabs, Button, Spin, message } from 'antd'
 import { ArrowLeftOutlined, EnvironmentOutlined, ToolOutlined } from '@ant-design/icons'
 import StatusTag from '../../components/admin/StatusTag'
-import { bornes, sessions } from '../../mock/data'
+import { apiClient } from '../../api/client'
+import { sessions } from '../../mock/data'
+import type { Borne } from '../../types'
 
 function BorneDetail() {
   const { id } = useParams()
-  const borne = bornes.find((b) => b.id === id)
+  const [borne, setBorne] = useState<Borne | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    const loadBorne = async () => {
+      try {
+        setLoading(true)
+        const { data } = await apiClient.get<Borne>(`/bornes/${id}`)
+        setBorne(data)
+      } catch {
+        message.error('Impossible de charger la borne')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    void loadBorne()
+  }, [id])
+
+  if (loading) {
+    return (
+      <div className="panel">
+        <Spin />
+      </div>
+    )
+  }
 
   if (!borne) {
     return (
