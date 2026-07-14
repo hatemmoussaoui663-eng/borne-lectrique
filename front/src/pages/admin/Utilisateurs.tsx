@@ -1,8 +1,8 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Table, Input, Select, Button, message, Tag } from 'antd'
 import { SearchOutlined, PlusOutlined, CreditCardOutlined } from '@ant-design/icons'
 import StatusTag from '../../components/admin/StatusTag'
-import { users } from '../../mock/data'
+import { getUsers } from '../../api/users'
 import type { AppUser, UserRole } from '../../types'
 
 const roleOptions: UserRole[] = [
@@ -15,19 +15,34 @@ const roleOptions: UserRole[] = [
 ]
 
 function Utilisateurs() {
+  const [users, setUsers] = useState<AppUser[]>([])
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>()
 
+  useEffect(() => {
+    async function loadUsers() {
+      try {
+        const data = await getUsers()
+        setUsers(data)
+      } catch {
+        message.error('Impossible de charger la liste des utilisateurs depuis le backend.')
+      }
+    }
+
+    loadUsers()
+  }, [])
+
   const filtered = useMemo(() => {
     return users.filter((u) => {
+      const label = (u.nom || '').toLowerCase()
       const matchesSearch =
         !search ||
-        u.nom.toLowerCase().includes(search.toLowerCase()) ||
+        label.includes(search.toLowerCase()) ||
         u.email.toLowerCase().includes(search.toLowerCase())
       const matchesRole = !roleFilter || u.role === roleFilter
       return matchesSearch && matchesRole
     })
-  }, [search, roleFilter])
+  }, [search, roleFilter, users])
 
   const columns = [
     {
@@ -42,16 +57,26 @@ function Utilisateurs() {
     },
     { title: 'Rôle', dataIndex: 'role', render: (v: string) => <Tag color="default">{v}</Tag> },
     {
-      title: 'Badge RFID',
-      dataIndex: 'badgeRfid',
-      render: (v: string) => (
+      title: 'Téléphone',
+      dataIndex: 'phone',
+      render: (v: string | undefined) => (
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
-          <CreditCardOutlined /> {v}
+          <CreditCardOutlined /> {v || '-'}
         </span>
       ),
     },
-    { title: 'Statut', dataIndex: 'statut', render: (v: string) => <StatusTag value={v} /> },
-    { title: 'Inscrit le', dataIndex: 'inscrit' },
+    {
+      title: 'Statut',
+      dataIndex: 'statut',
+      render: (value: 'Actif' | 'Bloqué' | 'Expiré') => (
+        <StatusTag value={value} />
+      ),
+    },
+    {
+      title: 'Inscrit le',
+      dataIndex: 'inscrit',
+      render: (value: string) => value || '-',
+    },
   ]
 
   return (

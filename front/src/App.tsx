@@ -3,6 +3,9 @@ import PublicLayout from "./layouts/PublicLayout";
 import AdminLayout from "./layouts/AdminLayout";
 import Home from "./pages/Home";
 import Login from "./pages/Login";
+import ForgotPassword from "./pages/ForgotPassword";
+import ResetPassword from "./pages/ResetPassword";
+import RequireAuth from "./components/RequireAuth";
 import Dashboard from "./pages/admin/Dashboard";
 import BornesList from "./pages/admin/BornesList";
 import BorneDetail from "./pages/admin/BorneDetail";
@@ -23,8 +26,10 @@ function App() {
       </Route>
 
       <Route path="/login" element={<Login />} />
+      <Route path="/forgot-password" element={<ForgotPassword />} />
+      <Route path="/reset-password" element={<ResetPassword />} />
 
-      <Route path="/dashboard" element={<AdminLayout />}>
+      <Route path="/dashboard" element={<RequireAuth><AdminLayout /></RequireAuth>}>
         <Route index element={<Dashboard />} />
         <Route path="bornes" element={<BornesList />} />
         <Route path="bornes/:id" element={<BorneDetail />} />

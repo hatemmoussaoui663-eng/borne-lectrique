@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { useAuth } from "../context/AuthContext";
 import { Layout, Menu, Badge, Avatar, Dropdown, Input } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -79,6 +80,7 @@ function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.innerWidth > MOBILE_BREAKPOINT,
   );
+  const { user, logout } = useAuth()
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -101,6 +103,26 @@ function AdminLayout() {
       danger: true,
     },
   ];
+
+  function handleUserMenuClick({ key }: { key: string }) {
+    if (key === "logout") {
+      logout()
+      return
+    }
+
+    if (key === "profile") {
+      navigate("/dashboard/parametres")
+    }
+  }
+
+  const avatarText = user?.name
+    ? user.name
+        .split(" ")
+        .map((part) => part[0])
+        .slice(0, 2)
+        .join("")
+        .toUpperCase()
+    : "AD";
 
   return (
     <Layout className="admin-layout">
@@ -162,17 +184,17 @@ function AdminLayout() {
                 <BellOutlined />
               </Badge>
             </Link>
-            <Dropdown menu={{ items: userMenu }} trigger={["click"]}>
+            <Dropdown menu={{ items: userMenu, onClick: handleUserMenuClick }} trigger={["click"]}>
               <div className="admin-header__user">
                 <Avatar
                   size={34}
                   style={{ background: "var(--accent)", color: "#06170c" }}
                 >
-                  SR
+                  {avatarText}
                 </Avatar>
                 <div className="admin-header__user-meta">
-                  <strong>Sami Rekik</strong>
-                  <span>Super Administrateur</span>
+                  <strong>{user?.name ?? "Administrateur"}</strong>
+                  <span>{user?.role ?? "Super Administrateur"}</span>
                 </div>
               </div>
             </Dropdown>

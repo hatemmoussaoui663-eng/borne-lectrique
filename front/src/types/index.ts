@@ -64,8 +64,21 @@ export interface AppUser {
   email: string
   role: UserRole
   badgeRfid: string
+  phone?: string | null
   statut: 'Actif' | 'Bloqué' | 'Expiré'
   inscrit: string
+}
+
+export interface AuthUser {
+  id: string
+  name: string
+  email: string
+  phone: string | null
+  role: string
+  role_slug: string
+  is_active: boolean
+  email_verified_at: string | null
+  created_at: string
 }
 
 export interface Vehicule {

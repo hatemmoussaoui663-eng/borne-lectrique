@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { Link } from "react-router-dom";
 import { Button, Input, message } from "antd";
 import {
   ThunderboltFilled,
@@ -7,11 +7,11 @@ import {
   LockOutlined,
   ArrowRightOutlined,
 } from "@ant-design/icons";
-import { apiClient } from "../api/client";
+import { useAuth } from "../context/AuthContext";
 import "./Login.css";
 
 function Login() {
-  const navigate = useNavigate();
+  const { login } = useAuth()
   const [email, setEmail] = useState("admin@bornelect.tn");
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
@@ -21,10 +21,8 @@ function Login() {
     setLoading(true);
 
     try {
-      const { data } = await apiClient.post("/auth/login", { email, password });
-      localStorage.setItem("auth_token", data.token);
+      await login(email, password)
       message.success("Connexion réussie");
-      navigate("/dashboard");
     } catch (error: unknown) {
       const responseMessage =
         error && typeof error === "object" && "response" in error && error.response && typeof error.response === "object" && "data" in error.response && error.response.data && typeof error.response.data === "object" && "message" in error.response.data
@@ -87,8 +85,7 @@ function Login() {
         </Button>
 
         <p className="login__hint">
-          Démo sans backend — n'importe quel identifiant vous connecte au
-          tableau de bord.
+          <Link to="/forgot-password">Mot de passe oublié ?</Link>
         </p>
       </form>
     </div>

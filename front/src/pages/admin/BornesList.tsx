@@ -27,7 +27,7 @@ function BornesList() {
   const [isMapModalVisible, setIsMapModalVisible] = useState(false)
   const [mapPos, setMapPos] = useState<[number, number] | null>(null)
 
-  function MapClickMarker({ position, setPosition }: { position: [number, number] | null; setPosition: (p: [number, number]) => void }) {
+  function MapClickMarker({ setPosition }: { setPosition: (p: [number, number]) => void }) {
     useMapEvents({
       click(e) {
         setPosition([e.latlng.lat, e.latlng.lng])
@@ -328,7 +328,7 @@ function BornesList() {
             <div style={{ height: 400 }}>
               <MapContainer center={[36.8, 10.18]} zoom={10} style={{ height: '100%', width: '100%' }}>
                 <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
-                <MapClickMarker position={mapPos} setPosition={setMapPos} />
+                <MapClickMarker setPosition={setMapPos} />
                 {mapPos && <Marker position={mapPos} />}
               </MapContainer>
             </div>

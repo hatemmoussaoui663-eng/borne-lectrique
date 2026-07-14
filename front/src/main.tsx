@@ -7,13 +7,16 @@ import { antdTheme } from './theme/tokens'
 import { queryClient } from './api/queryClient'
 import './index.css'
 import App from './App.tsx'
+import { AuthProvider } from './context/AuthContext'
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ConfigProvider theme={{ algorithm: antdThemeApi.darkAlgorithm, ...antdTheme }}>
       <QueryClientProvider client={queryClient}>
         <BrowserRouter>
-          <App />
+          <AuthProvider>
+            <App />
+          </AuthProvider>
         </BrowserRouter>
       </QueryClientProvider>
     </ConfigProvider>
