@@ -10,9 +10,7 @@ class BorneController extends Controller
 {
     public function index(): JsonResponse
     {
-        $bornes = Borne::orderBy('id')->get()->map(function (Borne $b) {
-            return $this->mapToFrontend($b);
-        });
+        $bornes = Borne::orderBy('id')->get()->map(fn (Borne $b) => $b->toFrontendArray());
 
         return response()->json($bornes);
     }
@@ -39,7 +37,7 @@ class BorneController extends Controller
         $borne = Borne::create($data);
 
         // build frontend-shaped payload merging request extras if present
-        $payload = $this->mapToFrontend($borne);
+        $payload = $borne->toFrontendArray();
         $payload = array_merge($payload, [
             'reference' => $request->input('reference', $payload['reference']),
             'numeroSerie' => $request->input('numeroSerie', $payload['numeroSerie']),
@@ -56,7 +54,7 @@ class BorneController extends Controller
 
     public function show(Borne $borne): JsonResponse
     {
-        return response()->json($this->mapToFrontend($borne));
+        return response()->json($borne->toFrontendArray());
     }
 
     public function update(Request $request, Borne $borne): JsonResponse
@@ -81,7 +79,7 @@ class BorneController extends Controller
         $borne->update($data);
 
         // return frontend-shaped object
-        return response()->json($this->mapToFrontend($borne));
+        return response()->json($borne->toFrontendArray());
     }
 
     public function destroy(Borne $borne): JsonResponse
@@ -89,40 +87,5 @@ class BorneController extends Controller
         $borne->delete();
 
         return response()->json(['message' => 'Deleted']);
-    }
-
-    /**
-     * Map a Borne model to the frontend expected shape.
-     *
-     * This returns keys used by the React app: `id`, `nom`, `reference`, `numeroSerie`,
-     * `modele`, `fabricant`, `adresse`, `ville`, `lat`, `lng`, `firmware`, `ocpp`,
-     * `puissance`, `etat`, `dernierHeartbeat`, `connecteurs`.
-     */
-    private function mapToFrontend(Borne $b): array
-    {
-        return [
-            'id' => $b->id,
-            'name' => $b->name,
-            'nom' => $b->name,
-            'reference' => $b->reference ?? '',
-            'numeroSerie' => $b->numero_serie ?? '',
-            'modele' => $b->modele ?? '',
-            'fabricant' => $b->fabricant ?? '',
-            'adresse' => $b->adresse ?? '',
-            'ville' => $b->ville ?? '',
-            'lat' => $b->latitude !== null ? (float) $b->latitude : 0,
-            'lng' => $b->longitude !== null ? (float) $b->longitude : 0,
-            'latitude' => $b->latitude !== null ? (float) $b->latitude : null,
-            'longitude' => $b->longitude !== null ? (float) $b->longitude : null,
-            'firmware' => $b->firmware ?? '',
-            'ocpp' => $b->ocpp ?? '1.6',
-            'puissance' => $b->puissance ?? 22,
-            'status' => $b->status ?? 'inactive',
-            'etat' => $b->status ?? 'Déconnectée',
-            'dernierHeartbeat' => $b->updated_at ? $b->updated_at->toDateTimeString() : null,
-            'connecteurs' => $b->connecteurs ?? [],
-            'created_at' => $b->created_at ? $b->created_at->toDateTimeString() : null,
-            'updated_at' => $b->updated_at ? $b->updated_at->toDateTimeString() : null,
-        ];
     }
 }

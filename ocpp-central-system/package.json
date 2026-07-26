@@ -1,0 +1,16 @@
+{
+  "name": "ocpp-central-system",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Minimal OCPP 1.6-J central system (CSMS) bridging the charge point simulator to the Laravel REST API.",
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

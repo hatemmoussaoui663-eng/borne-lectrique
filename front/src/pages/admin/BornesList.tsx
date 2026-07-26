@@ -6,6 +6,7 @@ import { SearchOutlined, PlusOutlined, EyeOutlined, DeleteOutlined } from '@ant-
 import StatusTag from '../../components/admin/StatusTag'
 import BornesMap from '../../components/admin/BornesMap'
 import { apiClient } from '../../api/client'
+import { echo } from '../../echo'
 import type { Borne, BorneEtat } from '../../types'
 
 const etatOptions: BorneEtat[] = [
@@ -16,6 +17,36 @@ const etatOptions: BorneEtat[] = [
   'Déconnectée',
   'Défaut',
 ]
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function normalizeBorne(item: any): Borne {
+  return {
+    id: String(item.id ?? item.ID ?? item._id ?? ''),
+    nom: item.nom ?? item.name ?? '',
+    reference: item.reference ?? '',
+    numeroSerie: item.numeroSerie ?? item.numero_serie ?? '',
+    modele: item.modele ?? '',
+    fabricant: item.fabricant ?? '',
+    adresse: item.adresse ?? '',
+    ville: item.ville ?? item.city ?? '',
+    lat: Number(item.lat ?? item.latitude ?? item.latitude ?? 0) || 0,
+    lng: Number(item.lng ?? item.longitude ?? item.longitude ?? 0) || 0,
+    firmware: item.firmware ?? '',
+    ocpp: item.ocpp ?? '1.6',
+    puissance: Number(item.puissance ?? item.power ?? 22) || 22,
+    etat: (item.etat ?? item.status ?? 'Déconnectée') as BorneEtat,
+    dernierHeartbeat: item.dernierHeartbeat ?? item.last_heartbeat ?? item.updated_at ?? '',
+    connecteurs: item.connecteurs ?? [],
+  }
+}
+
+function upsertById(list: Borne[], incoming: Borne): Borne[] {
+  const index = list.findIndex((b) => b.id === incoming.id)
+  if (index === -1) return [incoming, ...list]
+  const next = [...list]
+  next[index] = incoming
+  return next
+}
 
 function BornesList() {
   const [bornes, setBornes] = useState<Borne[]>([])
@@ -40,29 +71,7 @@ function BornesList() {
     try {
       setLoading(true)
       const { data } = await apiClient.get('/bornes')
-
-      // Normalize API response to frontend `Borne` shape
-      const normalized: Borne[] = (data || []).map((item: any) => ({
-        id: String(item.id ?? item.ID ?? item._id ?? ''),
-        nom: item.nom ?? item.name ?? '',
-        reference: item.reference ?? '',
-        numeroSerie: item.numeroSerie ?? item.numero_serie ?? '',
-        modele: item.modele ?? '',
-        fabricant: item.fabricant ?? '',
-        adresse: item.adresse ?? '',
-        ville: item.ville ?? item.city ?? '',
-        lat: Number(item.lat ?? item.latitude ?? item.latitude ?? 0) || 0,
-        lng: Number(item.lng ?? item.longitude ?? item.longitude ?? 0) || 0,
-        firmware: item.firmware ?? '',
-        ocpp: item.ocpp ?? '1.6',
-        puissance: Number(item.puissance ?? item.power ?? 22) || 22,
-        etat: (item.etat ?? item.status ?? 'Déconnectée') as BorneEtat,
-        dernierHeartbeat: item.dernierHeartbeat ?? item.last_heartbeat ?? item.updated_at ?? '',
-        connecteurs: item.connecteurs ?? [],
-      }))
-
-      console.debug('Loaded bornes:', normalized)
-      setBornes(normalized)
+      setBornes((data || []).map(normalizeBorne))
     } catch {
       message.error('Impossible de charger les bornes depuis l’API')
     } finally {
@@ -72,6 +81,15 @@ function BornesList() {
 
   useEffect(() => {
     void loadBornes()
+
+    const channel = echo.channel('bornes-updates')
+    channel.listen('.borne.updated', (payload: unknown) => {
+      setBornes((current) => upsertById(current, normalizeBorne(payload)))
+    })
+
+    return () => {
+      echo.leaveChannel('bornes-updates')
+    }
   }, [])
 
   const filtered = useMemo(() => {

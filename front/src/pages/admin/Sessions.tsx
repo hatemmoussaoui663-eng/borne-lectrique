@@ -1,31 +1,53 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Table, Input, Select } from 'antd'
 import { SearchOutlined } from '@ant-design/icons'
 import StatusTag from '../../components/admin/StatusTag'
-import { sessions } from '../../mock/data'
+import { getSessions } from '../../api/sessions'
+import { echo } from '../../echo'
 import type { ChargeSession, SessionEtat } from '../../types'
 
 const etatOptions: SessionEtat[] = ['En cours', 'En pause', 'Terminée', 'Annulée']
 
+function upsertById(list: ChargeSession[], incoming: ChargeSession): ChargeSession[] {
+  const index = list.findIndex((s) => s.id === incoming.id)
+  if (index === -1) return [incoming, ...list]
+  const next = [...list]
+  next[index] = incoming
+  return next
+}
+
 function Sessions() {
+  const [sessions, setSessions] = useState<ChargeSession[]>([])
   const [search, setSearch] = useState('')
   const [etatFilter, setEtatFilter] = useState<SessionEtat | undefined>()
+
+  useEffect(() => {
+    void getSessions().then(setSessions)
+
+    const channel = echo.channel('sessions-updates')
+    channel.listen('.session.updated', (session: ChargeSession) => {
+      setSessions((prev) => upsertById(prev, session))
+    })
+
+    return () => {
+      echo.leaveChannel('sessions-updates')
+    }
+  }, [])
 
   const filtered = useMemo(() => {
     return sessions.filter((s) => {
       const matchesSearch =
         !search ||
-        s.utilisateur.toLowerCase().includes(search.toLowerCase()) ||
+        (s.idTag ?? '').toLowerCase().includes(search.toLowerCase()) ||
         s.borne.toLowerCase().includes(search.toLowerCase())
       const matchesEtat = !etatFilter || s.etat === etatFilter
       return matchesSearch && matchesEtat
     })
-  }, [search, etatFilter])
+  }, [search, etatFilter, sessions])
 
   const columns = [
     { title: 'Session', dataIndex: 'id' },
-    { title: 'Utilisateur', dataIndex: 'utilisateur' },
-    { title: 'Véhicule', dataIndex: 'vehicule' },
+    { title: 'Badge (idTag)', dataIndex: 'idTag' },
     { title: 'Borne', dataIndex: 'borne' },
     { title: 'Connecteur', dataIndex: 'connecteur' },
     { title: 'Début', dataIndex: 'debut' },
@@ -48,7 +70,7 @@ function Sessions() {
         <div className="page-toolbar__filters">
           <Input
             className="page-toolbar__search"
-            placeholder="Rechercher un utilisateur, une borne…"
+            placeholder="Rechercher un badge, une borne…"
             prefix={<SearchOutlined />}
             value={search}
             onChange={(e) => setSearch(e.target.value)}

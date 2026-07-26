@@ -53,9 +53,9 @@ const items: MenuProps["items"] = [
     label: "Paramètres",
   },
   {
-    key: "/dashboard/test",
+    key: "/dashboard/simulator",
     icon: <AndroidOutlined />,
-    label: "TEST",
+    label: "Simulateur",
   },
 ];
 
@@ -69,7 +69,7 @@ const titles: Record<string, string> = {
   "/dashboard/alertes": "Alertes",
   "/dashboard/rapports": "Rapports",
   "/dashboard/parametres": "Paramètres",
-  "/dashboard/TEST": "test",
+  "/dashboard/simulator": "Simulateur OCPP",
 };
 
 const MOBILE_BREAKPOINT = 900;

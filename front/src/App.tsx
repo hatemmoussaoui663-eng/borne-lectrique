@@ -16,7 +16,7 @@ import Maintenance from "./pages/admin/Maintenance";
 import Alertes from "./pages/admin/Alertes";
 import Rapports from "./pages/admin/Rapports";
 import Parametres from "./pages/admin/Parametres";
-import Test from "./pages/admin/Test";
+import Simulator from "./pages/admin/Simulator";
 
 function App() {
   return (
@@ -40,7 +40,7 @@ function App() {
         <Route path="alertes" element={<Alertes />} />
         <Route path="rapports" element={<Rapports />} />
         <Route path="parametres" element={<Parametres />} />
-        <Route path="test" element={<Test />} />
+        <Route path="simulator" element={<Simulator />} />
       </Route>
     </Routes>
   );

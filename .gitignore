@@ -2,9 +2,6 @@
 
 # Node.js
 node_modules/
-pnpm-lock.yaml
-yarn.lock
-package-lock.json
 
 # Backend dependencies and build artifacts
 /back/node_modules/
@@ -26,12 +23,9 @@ package-lock.json
 /front/.turbo/
 
 # Environment and secrets
-*.env
+.env
 .env.*
-/back/.env
-/back/.env.*
-/front/.env
-/front/.env.*
+!.env.example
 
 # Laravel storage and cache
 /back/storage/
@@ -70,3 +64,11 @@ lerna-debug.log*
 
 # Misc
 /.fleet
+
+# Third-party project vendored as a plain folder (its own upstream git repo,
+# not a submodule here) - not meant to be pushed as part of this repo.
+/e-mobility-charging-stations-simulator/
+
+# ocpp-central-system (Node service) - node_modules/.env already covered by
+# its own .gitignore, but keep node_modules ignored here too for safety.
+/ocpp-central-system/node_modules/

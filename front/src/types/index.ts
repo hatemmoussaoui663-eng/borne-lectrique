@@ -39,11 +39,15 @@ export type SessionEtat = 'En cours' | 'Terminée' | 'Annulée' | 'En pause'
 
 export interface ChargeSession {
   id: string
-  utilisateur: string
-  vehicule: string
+  /** Resolved display name, when available (mock data only for now). */
+  utilisateur?: string
+  /** Raw RFID badge presented at Authorize/StartTransaction — what real OCPP sessions actually carry. */
+  idTag?: string
+  /** No OCPP data source yet (needs Module 8 vehicle records) — mock data only. */
+  vehicule?: string
   borne: string
-  connecteur: ConnecteurType
-  debut: string
+  connecteur: string
+  debut: string | null
   fin: string | null
   dureeMin: number
   energieKwh: number
