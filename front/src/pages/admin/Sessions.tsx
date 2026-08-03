@@ -47,7 +47,11 @@ function Sessions() {
 
   const columns = [
     { title: 'Session', dataIndex: 'id' },
-    { title: 'Badge (idTag)', dataIndex: 'idTag' },
+    {
+      title: 'Utilisateur',
+      dataIndex: 'utilisateur',
+      render: (_: string | undefined, r: ChargeSession) => r.utilisateur ?? r.idTag ?? '—',
+    },
     { title: 'Borne', dataIndex: 'borne' },
     { title: 'Connecteur', dataIndex: 'connecteur' },
     { title: 'Début', dataIndex: 'debut' },
@@ -60,6 +64,11 @@ function Sessions() {
       title: 'Énergie',
       dataIndex: 'energieKwh',
       render: (v: number) => `${v.toFixed(1)} kWh`,
+    },
+    {
+      title: 'Prix',
+      dataIndex: 'prix',
+      render: (v: number) => `${v.toFixed(3)} DT`,
     },
     { title: 'État', dataIndex: 'etat', render: (v: string) => <StatusTag value={v} /> },
   ]

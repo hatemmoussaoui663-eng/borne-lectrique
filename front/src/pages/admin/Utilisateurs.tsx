@@ -1,8 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Table, Input, Select, Button, message, Tag } from 'antd'
-import { SearchOutlined, PlusOutlined, CreditCardOutlined } from '@ant-design/icons'
+import { Table, Input, Select, Button, message, Tag, Modal } from 'antd'
+import { SearchOutlined, PlusOutlined, CreditCardOutlined, IdcardOutlined } from '@ant-design/icons'
 import StatusTag from '../../components/admin/StatusTag'
-import { getUsers } from '../../api/users'
+import { getUsers, updateUserBadge } from '../../api/users'
 import type { AppUser, UserRole } from '../../types'
 
 const roleOptions: UserRole[] = [
@@ -18,6 +18,9 @@ function Utilisateurs() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>()
+  const [badgeEditUser, setBadgeEditUser] = useState<AppUser | null>(null)
+  const [badgeValue, setBadgeValue] = useState('')
+  const [savingBadge, setSavingBadge] = useState(false)
 
   useEffect(() => {
     async function loadUsers() {
@@ -31,6 +34,26 @@ function Utilisateurs() {
 
     loadUsers()
   }, [])
+
+  function openBadgeEditor(user: AppUser) {
+    setBadgeEditUser(user)
+    setBadgeValue(user.badgeRfid)
+  }
+
+  async function saveBadge() {
+    if (!badgeEditUser) return
+    try {
+      setSavingBadge(true)
+      const updated = await updateUserBadge(badgeEditUser.id, badgeValue.trim())
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+      setBadgeEditUser(null)
+      message.success('Badge RFID mis à jour.')
+    } catch {
+      message.error('Impossible de mettre à jour le badge (déjà utilisé par un autre utilisateur ?).')
+    } finally {
+      setSavingBadge(false)
+    }
+  }
 
   const filtered = useMemo(() => {
     return users.filter((u) => {
@@ -63,6 +86,21 @@ function Utilisateurs() {
         <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6 }}>
           <CreditCardOutlined /> {v || '-'}
         </span>
+      ),
+    },
+    {
+      title: 'Badge RFID',
+      dataIndex: 'badgeRfid',
+      render: (v: string, r: AppUser) => (
+        <Button
+          size="small"
+          type="text"
+          icon={<IdcardOutlined />}
+          onClick={() => openBadgeEditor(r)}
+          style={{ color: v ? 'var(--text-primary)' : 'var(--text-muted)' }}
+        >
+          {v || 'Associer un badge'}
+        </Button>
       ),
     },
     {
@@ -112,6 +150,23 @@ function Utilisateurs() {
       <div className="panel">
         <Table rowKey="id" columns={columns} dataSource={filtered} pagination={{ pageSize: 8 }} />
       </div>
+
+      <Modal
+        title={`Badge RFID — ${badgeEditUser?.nom ?? ''}`}
+        open={badgeEditUser !== null}
+        onCancel={() => setBadgeEditUser(null)}
+        onOk={() => void saveBadge()}
+        confirmLoading={savingBadge}
+        okText="Enregistrer"
+        cancelText="Annuler"
+      >
+        <Input
+          placeholder="Numéro du badge RFID"
+          value={badgeValue}
+          onChange={(e) => setBadgeValue(e.target.value)}
+          prefix={<IdcardOutlined />}
+        />
+      </Modal>
     </div>
   )
 }

@@ -4,6 +4,8 @@ namespace Tests\Feature;
 
 use App\Models\Borne;
 use App\Models\ChargeSession;
+use App\Models\Tarif;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -92,5 +94,25 @@ class OcppIngestTest extends TestCase
         $this->assertSame('Terminée', $session->status);
         $this->assertEquals(2.5, $session->energie_kwh);
         $this->assertNotNull($session->stopped_at);
+        $this->assertEquals(round(2.5 * Tarif::current()->prix_kwh, 3), $session->prix);
+    }
+
+    public function test_start_transaction_links_the_session_to_the_user_owning_the_badge(): void
+    {
+        Borne::factory()->create(['charge_point_id' => 'CS-TEST-004']);
+        $user = User::factory()->create(['badge_rfid' => 'BADGE-42']);
+
+        $start = $this->withHeaders(['X-Internal-Token' => self::TOKEN])
+            ->postJson('/api/internal/ocpp/start-transaction', [
+                'chargePointId' => 'CS-TEST-004',
+                'connectorId' => 1,
+                'idTag' => 'BADGE-42',
+                'meterStart' => 0,
+            ]);
+
+        $start->assertOk();
+
+        $session = ChargeSession::findOrFail($start->json('transactionId'));
+        $this->assertSame($user->id, $session->user_id);
     }
 }

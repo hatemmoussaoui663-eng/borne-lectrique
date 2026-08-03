@@ -51,6 +51,7 @@ export interface ChargeSession {
   fin: string | null
   dureeMin: number
   energieKwh: number
+  prix: number
   etat: SessionEtat
 }
 
@@ -78,6 +79,7 @@ export interface AuthUser {
   name: string
   email: string
   phone: string | null
+  badge_rfid: string | null
   role: string
   role_slug: string
   is_active: boolean

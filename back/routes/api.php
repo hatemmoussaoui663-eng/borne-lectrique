@@ -1,10 +1,13 @@
 <?php
 
+use App\Http\Controllers\AlerteController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\BorneController;
 use App\Http\Controllers\ChargeSessionController;
+use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\OcppIngestController;
 use App\Http\Controllers\SimulatorController;
+use App\Http\Controllers\TarifController;
 use App\Http\Controllers\UserController;
 use Illuminate\Support\Facades\Route;
 
@@ -20,6 +23,11 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('bornes', BorneController::class);
     Route::apiResource('users', UserController::class);
     Route::get('/sessions', [ChargeSessionController::class, 'index']);
+    Route::get('/dashboard', [DashboardController::class, 'index']);
+    Route::get('/alertes', [AlerteController::class, 'index']);
+    Route::patch('/alertes/{alerte}/read', [AlerteController::class, 'markRead']);
+    Route::get('/tarif', [TarifController::class, 'show']);
+    Route::put('/tarif', [TarifController::class, 'update']);
 
     Route::prefix('simulator')->group(function () {
         Route::get('/status', [SimulatorController::class, 'status']);

@@ -17,6 +17,7 @@ class User extends Authenticatable
         'name',
         'email',
         'phone',
+        'badge_rfid',
         'role_id',
         'is_active',
         'password',

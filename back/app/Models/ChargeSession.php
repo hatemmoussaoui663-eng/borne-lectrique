@@ -2,18 +2,23 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class ChargeSession extends Model
 {
+    use HasFactory;
+
     protected $fillable = [
         'borne_id',
         'connector_id',
         'id_tag',
+        'user_id',
         'meter_start',
         'meter_stop',
         'energie_kwh',
+        'prix',
         'status',
         'started_at',
         'stopped_at',
@@ -21,6 +26,7 @@ class ChargeSession extends Model
 
     protected $casts = [
         'energie_kwh' => 'float',
+        'prix' => 'float',
         'started_at' => 'datetime',
         'stopped_at' => 'datetime',
     ];
@@ -30,9 +36,15 @@ class ChargeSession extends Model
         return $this->belongsTo(Borne::class);
     }
 
+    public function user(): BelongsTo
+    {
+        return $this->belongsTo(User::class);
+    }
+
     /**
      * Map to the shape the React app's `ChargeSession` type expects: `id`, `borne`,
-     * `connecteur`, `idTag`, `debut`, `fin`, `dureeMin`, `energieKwh`, `etat`.
+     * `connecteur`, `idTag`, `utilisateur`, `debut`, `fin`, `dureeMin`, `energieKwh`,
+     * `prix`, `etat`.
      */
     public function toFrontendArray(): array
     {
@@ -44,10 +56,12 @@ class ChargeSession extends Model
             'borne' => $this->borne?->name ?? '',
             'connecteur' => (string) $this->connector_id,
             'idTag' => $this->id_tag ?? '',
+            'utilisateur' => $this->user?->name,
             'debut' => $this->started_at ? $this->started_at->toDateTimeString() : null,
             'fin' => $this->stopped_at ? $this->stopped_at->toDateTimeString() : null,
             'dureeMin' => $dureeMin,
             'energieKwh' => (float) $this->energie_kwh,
+            'prix' => (float) ($this->prix ?? 0),
             'etat' => $this->status,
         ];
     }

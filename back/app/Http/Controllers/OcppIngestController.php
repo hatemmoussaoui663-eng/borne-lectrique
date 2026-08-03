@@ -2,10 +2,14 @@
 
 namespace App\Http\Controllers;
 
+use App\Events\AlerteUpdated;
 use App\Events\BorneUpdated;
 use App\Events\ChargeSessionUpdated;
+use App\Models\Alerte;
 use App\Models\Borne;
 use App\Models\ChargeSession;
+use App\Models\Tarif;
+use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -87,6 +91,9 @@ class OcppIngestController extends Controller
             'borne_id' => $borne->id,
             'connector_id' => $data['connectorId'],
             'id_tag' => $data['idTag'] ?? null,
+            'user_id' => isset($data['idTag'])
+                ? User::where('badge_rfid', $data['idTag'])->value('id')
+                : null,
             'meter_start' => $data['meterStart'] ?? null,
             'status' => 'En cours',
             'started_at' => now(),
@@ -140,6 +147,7 @@ class OcppIngestController extends Controller
         if ($meterStop !== null && $session->meter_start !== null) {
             $session->energie_kwh = round(max(0, $meterStop - $session->meter_start) / 1000, 3);
         }
+        $session->prix = round($session->energie_kwh * Tarif::current()->prix_kwh, 3);
         $session->status = 'Terminée';
         $session->stopped_at = now();
         $session->save();
@@ -167,6 +175,7 @@ class OcppIngestController extends Controller
             $borne->status = 'Déconnectée';
             $borne->save();
             BorneUpdated::dispatch($borne);
+            $this->maybeRaiseAlert($borne, 0, 'deconnexion', 'critical', "{$borne->name} déconnectée du système central");
         }
 
         return response()->json(['ok' => true]);
@@ -207,6 +216,9 @@ class OcppIngestController extends Controller
             if (in_array($ocppStatus, ['Faulted', 'Unavailable'], true)) {
                 $borne->status = $etat;
             }
+            if ($ocppStatus === 'Faulted') {
+                $this->maybeRaiseAlert($borne, 0, 'defaut_materiel', 'critical', "Défaut matériel sur {$borne->name}");
+            }
 
             return;
         }
@@ -231,6 +243,43 @@ class OcppIngestController extends Controller
 
         $borne->connecteurs = $connecteurs->values()->all();
         $borne->status = $this->recomputeAggregateStatus($borne->connecteurs);
+
+        if ($ocppStatus === 'Faulted') {
+            $this->maybeRaiseAlert(
+                $borne,
+                $connectorId,
+                'defaut_materiel',
+                'critical',
+                "Défaut matériel sur le connecteur {$connectorId} de {$borne->name}"
+            );
+        }
+    }
+
+    /**
+     * Raise a new alert unless an unread one of the same (borne, connector, type)
+     * already exists — keeps a flapping OCPP status from spamming duplicates.
+     */
+    private function maybeRaiseAlert(Borne $borne, int $connectorId, string $type, string $severite, string $message): void
+    {
+        $hasUnread = Alerte::where('borne_id', $borne->id)
+            ->where('connector_id', $connectorId)
+            ->where('type', $type)
+            ->whereNull('read_at')
+            ->exists();
+
+        if ($hasUnread) {
+            return;
+        }
+
+        $alerte = Alerte::create([
+            'borne_id' => $borne->id,
+            'connector_id' => $connectorId,
+            'type' => $type,
+            'severite' => $severite,
+            'message' => $message,
+        ]);
+
+        AlerteUpdated::dispatch($alerte);
     }
 
     private function mapConnectorStatus(string $ocppStatus): string
