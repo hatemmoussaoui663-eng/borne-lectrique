@@ -67,7 +67,6 @@ lerna-debug.log*
 
 # Third-party project vendored as a plain folder (its own upstream git repo,
 # not a submodule here) - not meant to be pushed as part of this repo.
-/e-mobility-charging-stations-simulator/
 
 # ocpp-central-system (Node service) - node_modules/.env already covered by
 # its own .gitignore, but keep node_modules ignored here too for safety.
