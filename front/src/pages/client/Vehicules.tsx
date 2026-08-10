@@ -1,29 +1,31 @@
 import { useEffect, useState } from 'react'
 import { Table, Tag, Button, Modal, Form, Input, InputNumber, Select, message, Popconfirm } from 'antd'
 import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
-import { getVehicules, createVehicule, updateVehicule, deleteVehicule, type VehiculeInput } from '../../api/vehicules'
-import { getUsers } from '../../api/users'
-import type { AppUser, ConnecteurType, Vehicule } from '../../types'
+import {
+  getMyVehicules,
+  createMyVehicule,
+  updateMyVehicule,
+  deleteMyVehicule,
+  type MyVehiculeInput,
+} from '../../api/me'
+import type { ConnecteurType, Vehicule } from '../../types'
 
 const connecteurOptions: ConnecteurType[] = ['CCS', 'Type2', 'CHAdeMO', 'AC', 'DC']
 
-function Vehicules() {
+function ClientVehicules() {
   const [vehicules, setVehicules] = useState<Vehicule[]>([])
-  const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [editing, setEditing] = useState<Vehicule | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [form] = Form.useForm<VehiculeInput>()
+  const [form] = Form.useForm<MyVehiculeInput>()
 
   async function load() {
     try {
       setLoading(true)
-      const [v, u] = await Promise.all([getVehicules(), getUsers()])
-      setVehicules(v)
-      setUsers(u)
+      setVehicules(await getMyVehicules())
     } catch {
-      message.error('Impossible de charger les véhicules depuis le backend.')
+      message.error('Impossible de charger vos véhicules.')
     } finally {
       setLoading(false)
     }
@@ -41,9 +43,7 @@ function Vehicules() {
 
   function openEdit(v: Vehicule) {
     setEditing(v)
-    const owner = users.find((u) => u.nom === v.proprietaire)
     form.setFieldsValue({
-      userId: owner?.id,
       marque: v.marque,
       modele: v.modele,
       immatriculation: v.immatriculation,
@@ -55,7 +55,7 @@ function Vehicules() {
 
   async function handleDelete(id: string) {
     try {
-      await deleteVehicule(id)
+      await deleteMyVehicule(id)
       setVehicules((prev) => prev.filter((v) => v.id !== id))
       message.success('Véhicule supprimé.')
     } catch {
@@ -63,10 +63,10 @@ function Vehicules() {
     }
   }
 
-  async function handleSave(values: VehiculeInput) {
+  async function handleSave(values: MyVehiculeInput) {
     try {
       setSaving(true)
-      const saved = editing ? await updateVehicule(editing.id, values) : await createVehicule(values)
+      const saved = editing ? await updateMyVehicule(editing.id, values) : await createMyVehicule(values)
       setVehicules((prev) =>
         editing ? prev.map((v) => (v.id === saved.id ? saved : v)) : [saved, ...prev]
       )
@@ -80,7 +80,6 @@ function Vehicules() {
   }
 
   const columns = [
-    { title: 'Propriétaire', dataIndex: 'proprietaire', render: (v: string) => v || '—' },
     {
       title: 'Véhicule',
       dataIndex: 'marque',
@@ -110,7 +109,7 @@ function Vehicules() {
   return (
     <div>
       <div className="page-toolbar">
-        <p style={{ margin: 0 }}>Véhicules électriques associés aux utilisateurs.</p>
+        <p style={{ margin: 0 }}>Véhicules électriques associés à votre compte.</p>
         <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
           Ajouter un véhicule
         </Button>
@@ -131,13 +130,6 @@ function Vehicules() {
         destroyOnClose
       >
         <Form form={form} layout="vertical" onFinish={(v) => void handleSave(v)}>
-          <Form.Item label="Propriétaire" name="userId">
-            <Select
-              allowClear
-              placeholder="Aucun (non assigné)"
-              options={users.map((u) => ({ label: u.nom, value: u.id }))}
-            />
-          </Form.Item>
           <Form.Item label="Marque" name="marque" rules={[{ required: true, message: 'La marque est requise' }]}>
             <Input placeholder="Renault, Tesla…" />
           </Form.Item>
@@ -167,4 +159,4 @@ function Vehicules() {
   )
 }
 
-export default Vehicules
+export default ClientVehicules

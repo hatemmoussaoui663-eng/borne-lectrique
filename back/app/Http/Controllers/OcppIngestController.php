@@ -6,10 +6,10 @@ use App\Events\AlerteUpdated;
 use App\Events\BorneUpdated;
 use App\Events\ChargeSessionUpdated;
 use App\Models\Alerte;
+use App\Models\Badge;
 use App\Models\Borne;
 use App\Models\ChargeSession;
 use App\Models\Tarif;
-use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -76,6 +76,15 @@ class OcppIngestController extends Controller
         return response()->json(['ok' => true]);
     }
 
+    public function authorize(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'idTag' => 'nullable|string|max:255',
+        ]);
+
+        return response()->json(['status' => $this->resolveIdTagStatus($data['idTag'] ?? null)]);
+    }
+
     public function startTransaction(Request $request): JsonResponse
     {
         $data = $request->validate([
@@ -85,15 +94,23 @@ class OcppIngestController extends Controller
             'meterStart' => 'nullable|integer|min:0',
         ]);
 
+        $idTag = $data['idTag'] ?? null;
+        $idTagStatus = $this->resolveIdTagStatus($idTag);
+
+        // A blocked/expired badge never opens a session — the CSMS refuses the
+        // transaction outright, mirroring how a real charge point would react.
+        if ($idTagStatus !== 'Accepted') {
+            return response()->json(['transactionId' => 0, 'idTagStatus' => $idTagStatus]);
+        }
+
         $borne = $this->resolveBorne($data['chargePointId']);
+        $badge = $idTag !== null ? Badge::where('code', $idTag)->first() : null;
 
         $session = ChargeSession::create([
             'borne_id' => $borne->id,
             'connector_id' => $data['connectorId'],
-            'id_tag' => $data['idTag'] ?? null,
-            'user_id' => isset($data['idTag'])
-                ? User::where('badge_rfid', $data['idTag'])->value('id')
-                : null,
+            'id_tag' => $idTag,
+            'user_id' => $badge?->user_id,
             'meter_start' => $data['meterStart'] ?? null,
             'status' => 'En cours',
             'started_at' => now(),
@@ -106,7 +123,7 @@ class OcppIngestController extends Controller
         ChargeSessionUpdated::dispatch($session);
         BorneUpdated::dispatch($borne);
 
-        return response()->json(['transactionId' => $session->id]);
+        return response()->json(['transactionId' => $session->id, 'idTagStatus' => 'Accepted']);
     }
 
     public function meterValues(Request $request): JsonResponse
@@ -179,6 +196,22 @@ class OcppIngestController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * OCPP idTagInfo.status for a presented badge. Unregistered idTags are left
+     * Accepted (the simulator's own generated tags aren't pre-provisioned as
+     * badges) — only badges explicitly created via Module 7 can gate charging.
+     */
+    private function resolveIdTagStatus(?string $idTag): string
+    {
+        if ($idTag === null || $idTag === '') {
+            return 'Accepted';
+        }
+
+        $badge = Badge::where('code', $idTag)->first();
+
+        return $badge?->ocppStatus() ?? 'Accepted';
     }
 
     private function resolveBorne(string $chargePointId): Borne

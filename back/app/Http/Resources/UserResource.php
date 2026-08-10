@@ -14,7 +14,12 @@ class UserResource extends JsonResource
             'name' => $this->name,
             'email' => $this->email,
             'phone' => $this->phone,
-            'badge_rfid' => $this->badge_rfid,
+            'badge' => $this->whenLoaded('badge', fn () => $this->badge === null ? null : [
+                'id' => $this->badge->id,
+                'code' => $this->badge->code,
+                'status' => $this->badge->status,
+                'expiresAt' => $this->badge->expires_at?->toDateString(),
+            ]),
             'role' => $this->role->display_name,
             'role_slug' => $this->role->name,
             'is_active' => $this->is_active,

@@ -59,8 +59,14 @@ async function statusNotification(payload, { chargePointId, log }) {
   return {}
 }
 
-async function authorize() {
-  return { idTagInfo: { status: 'Accepted' } }
+async function authorize(payload, { log }) {
+  try {
+    const result = await postToLaravel('/authorize', { idTag: payload.idTag })
+    return { idTagInfo: { status: result.status ?? 'Accepted' } }
+  } catch (error) {
+    log(`authorize ingest failed: ${error.message}; defaulting to Accepted`)
+    return { idTagInfo: { status: 'Accepted' } }
+  }
 }
 
 async function startTransaction(payload, { chargePointId, log }) {
@@ -72,7 +78,10 @@ async function startTransaction(payload, { chargePointId, log }) {
       meterStart: payload.meterStart,
     })
 
-    return { transactionId: result.transactionId, idTagInfo: { status: 'Accepted' } }
+    return {
+      transactionId: result.transactionId,
+      idTagInfo: { status: result.idTagStatus ?? 'Accepted' },
+    }
   } catch (error) {
     log(`start-transaction ingest failed: ${error.message}; using a local fallback id`)
     return { transactionId: Date.now() % 1_000_000, idTagInfo: { status: 'Accepted' } }

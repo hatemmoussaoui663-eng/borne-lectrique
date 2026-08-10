@@ -31,7 +31,7 @@ class UserFactory extends Factory
             'email_verified_at' => now(),
             'password' => static::$password ??= Hash::make('password'),
             'remember_token' => Str::random(10),
-            'role_id' => Role::firstOrCreate(['name' => 'client'], ['display_name' => 'Client'])->id,
+            'role_id' => Role::firstOrCreate(['name' => 'super_admin'], ['display_name' => 'Super Administrateur'])->id,
         ];
     }
 
@@ -42,6 +42,16 @@ class UserFactory extends Factory
     {
         return $this->state(fn (array $attributes) => [
             'email_verified_at' => null,
+        ]);
+    }
+
+    /**
+     * Give the user the "Client" role (Espace Client), instead of the default staff role.
+     */
+    public function client(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'role_id' => Role::firstOrCreate(['name' => 'client'], ['display_name' => 'Client'])->id,
         ]);
     }
 }

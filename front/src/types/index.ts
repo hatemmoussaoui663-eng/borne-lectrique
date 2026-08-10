@@ -63,12 +63,21 @@ export type UserRole =
   | 'Service Client'
   | 'Client'
 
+export type BadgeStatut = 'Actif' | 'Bloqué' | 'Expiré'
+
+export interface Badge {
+  id: string
+  code: string
+  status: BadgeStatut
+  expiresAt: string | null
+}
+
 export interface AppUser {
   id: string
   nom: string
   email: string
   role: UserRole
-  badgeRfid: string
+  badge: Badge | null
   phone?: string | null
   statut: 'Actif' | 'Bloqué' | 'Expiré'
   inscrit: string
@@ -79,7 +88,7 @@ export interface AuthUser {
   name: string
   email: string
   phone: string | null
-  badge_rfid: string | null
+  badge: Badge | null
   role: string
   role_slug: string
   is_active: boolean

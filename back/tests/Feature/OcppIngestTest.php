@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Badge;
 use App\Models\Borne;
 use App\Models\ChargeSession;
 use App\Models\Tarif;
@@ -100,7 +101,8 @@ class OcppIngestTest extends TestCase
     public function test_start_transaction_links_the_session_to_the_user_owning_the_badge(): void
     {
         Borne::factory()->create(['charge_point_id' => 'CS-TEST-004']);
-        $user = User::factory()->create(['badge_rfid' => 'BADGE-42']);
+        $user = User::factory()->create();
+        Badge::factory()->create(['code' => 'BADGE-42', 'user_id' => $user->id]);
 
         $start = $this->withHeaders(['X-Internal-Token' => self::TOKEN])
             ->postJson('/api/internal/ocpp/start-transaction', [
@@ -114,5 +116,24 @@ class OcppIngestTest extends TestCase
 
         $session = ChargeSession::findOrFail($start->json('transactionId'));
         $this->assertSame($user->id, $session->user_id);
+    }
+
+    public function test_start_transaction_rejects_a_blocked_badge(): void
+    {
+        Borne::factory()->create(['charge_point_id' => 'CS-TEST-005']);
+        $user = User::factory()->create();
+        Badge::factory()->create(['code' => 'BADGE-BLOCKED', 'user_id' => $user->id, 'status' => 'Bloqué']);
+
+        $start = $this->withHeaders(['X-Internal-Token' => self::TOKEN])
+            ->postJson('/api/internal/ocpp/start-transaction', [
+                'chargePointId' => 'CS-TEST-005',
+                'connectorId' => 1,
+                'idTag' => 'BADGE-BLOCKED',
+                'meterStart' => 0,
+            ]);
+
+        $start->assertOk();
+        $start->assertJson(['transactionId' => 0, 'idTagStatus' => 'Blocked']);
+        $this->assertSame(0, ChargeSession::count());
     }
 }

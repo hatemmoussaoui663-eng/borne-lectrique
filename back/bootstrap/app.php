@@ -19,6 +19,7 @@ return Application::configure(basePath: dirname(__DIR__))
 
         $middleware->alias([
             'ocpp.internal' => \App\Http\Middleware\VerifyInternalOcppToken::class,
+            'staff' => \App\Http\Middleware\EnsureStaffRole::class,
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {

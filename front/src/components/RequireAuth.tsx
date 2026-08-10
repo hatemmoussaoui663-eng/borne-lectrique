@@ -2,8 +2,15 @@ import { type ReactNode } from 'react'
 import { Navigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-function RequireAuth({ children }: { children: ReactNode }) {
-  const { isAuthenticated, loading } = useAuth()
+interface RequireAuthProps {
+  children: ReactNode
+  /** If set, only these role_slug values may access the route; everyone else is sent to `fallback`. */
+  roles?: string[]
+  fallback?: string
+}
+
+function RequireAuth({ children, roles, fallback = '/dashboard' }: RequireAuthProps) {
+  const { isAuthenticated, loading, user } = useAuth()
   const location = useLocation()
 
   if (loading) {
@@ -12,6 +19,10 @@ function RequireAuth({ children }: { children: ReactNode }) {
 
   if (!isAuthenticated) {
     return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
+  if (roles && user && !roles.includes(user.role_slug)) {
+    return <Navigate to={fallback} replace />
   }
 
   return children

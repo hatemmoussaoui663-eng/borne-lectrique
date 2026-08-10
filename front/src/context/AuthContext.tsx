@@ -63,7 +63,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser(data.user)
       setLoading(false)
       setError(null)
-      navigate('/dashboard')
+      navigate(data.user.role_slug === 'client' ? '/client' : '/dashboard')
     } catch (err: unknown) {
       setError('Impossible de se connecter')
       setLoading(false)

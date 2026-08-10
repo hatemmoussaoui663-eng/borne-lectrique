@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Table, Input, Select, Button, message, Tag, Modal } from 'antd'
+import { Table, Input, Select, Button, message, Tag, Modal, DatePicker, Form } from 'antd'
 import { SearchOutlined, PlusOutlined, CreditCardOutlined, IdcardOutlined } from '@ant-design/icons'
+import dayjs, { type Dayjs } from 'dayjs'
 import StatusTag from '../../components/admin/StatusTag'
 import { getUsers, updateUserBadge } from '../../api/users'
-import type { AppUser, UserRole } from '../../types'
+import type { AppUser, BadgeStatut, UserRole } from '../../types'
 
 const roleOptions: UserRole[] = [
   'Super Administrateur',
@@ -14,13 +15,21 @@ const roleOptions: UserRole[] = [
   'Client',
 ]
 
+const badgeStatutOptions: BadgeStatut[] = ['Actif', 'Bloqué', 'Expiré']
+
+interface BadgeFormValues {
+  code: string
+  status: BadgeStatut
+  expiresAt: Dayjs | null
+}
+
 function Utilisateurs() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState<UserRole | undefined>()
   const [badgeEditUser, setBadgeEditUser] = useState<AppUser | null>(null)
-  const [badgeValue, setBadgeValue] = useState('')
   const [savingBadge, setSavingBadge] = useState(false)
+  const [form] = Form.useForm<BadgeFormValues>()
 
   useEffect(() => {
     async function loadUsers() {
@@ -37,14 +46,22 @@ function Utilisateurs() {
 
   function openBadgeEditor(user: AppUser) {
     setBadgeEditUser(user)
-    setBadgeValue(user.badgeRfid)
+    form.setFieldsValue({
+      code: user.badge?.code ?? '',
+      status: user.badge?.status ?? 'Actif',
+      expiresAt: user.badge?.expiresAt ? dayjs(user.badge.expiresAt) : null,
+    })
   }
 
-  async function saveBadge() {
+  async function saveBadge(values: BadgeFormValues) {
     if (!badgeEditUser) return
     try {
       setSavingBadge(true)
-      const updated = await updateUserBadge(badgeEditUser.id, badgeValue.trim())
+      const updated = await updateUserBadge(badgeEditUser.id, {
+        code: values.code.trim(),
+        status: values.status,
+        expiresAt: values.expiresAt ? values.expiresAt.format('YYYY-MM-DD') : null,
+      })
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
       setBadgeEditUser(null)
       message.success('Badge RFID mis à jour.')
@@ -66,6 +83,12 @@ function Utilisateurs() {
       return matchesSearch && matchesRole
     })
   }, [search, roleFilter, users])
+
+  const badgeStatutColor: Record<BadgeStatut, string> = {
+    Actif: 'success',
+    Bloqué: 'error',
+    Expiré: 'default',
+  }
 
   const columns = [
     {
@@ -90,18 +113,24 @@ function Utilisateurs() {
     },
     {
       title: 'Badge RFID',
-      dataIndex: 'badgeRfid',
-      render: (v: string, r: AppUser) => (
+      dataIndex: 'badge',
+      render: (_: AppUser['badge'], r: AppUser) => (
         <Button
           size="small"
           type="text"
           icon={<IdcardOutlined />}
           onClick={() => openBadgeEditor(r)}
-          style={{ color: v ? 'var(--text-primary)' : 'var(--text-muted)' }}
+          style={{ color: r.badge ? 'var(--text-primary)' : 'var(--text-muted)' }}
         >
-          {v || 'Associer un badge'}
+          {r.badge ? r.badge.code : 'Associer un badge'}
         </Button>
       ),
+    },
+    {
+      title: 'Statut badge',
+      dataIndex: 'badge',
+      render: (_: AppUser['badge'], r: AppUser) =>
+        r.badge ? <Tag color={badgeStatutColor[r.badge.status]}>{r.badge.status}</Tag> : <span>-</span>,
     },
     {
       title: 'Statut',
@@ -155,17 +184,23 @@ function Utilisateurs() {
         title={`Badge RFID — ${badgeEditUser?.nom ?? ''}`}
         open={badgeEditUser !== null}
         onCancel={() => setBadgeEditUser(null)}
-        onOk={() => void saveBadge()}
+        onOk={() => form.submit()}
         confirmLoading={savingBadge}
         okText="Enregistrer"
         cancelText="Annuler"
+        destroyOnClose
       >
-        <Input
-          placeholder="Numéro du badge RFID"
-          value={badgeValue}
-          onChange={(e) => setBadgeValue(e.target.value)}
-          prefix={<IdcardOutlined />}
-        />
+        <Form form={form} layout="vertical" onFinish={(v) => void saveBadge(v)}>
+          <Form.Item label="Numéro du badge (laisser vide pour détacher)" name="code">
+            <Input placeholder="Numéro du badge RFID" prefix={<IdcardOutlined />} />
+          </Form.Item>
+          <Form.Item label="Statut" name="status">
+            <Select options={badgeStatutOptions.map((s) => ({ label: s, value: s }))} />
+          </Form.Item>
+          <Form.Item label="Date d'expiration (optionnelle)" name="expiresAt">
+            <DatePicker style={{ width: '100%' }} format="DD/MM/YYYY" />
+          </Form.Item>
+        </Form>
       </Modal>
     </div>
   )
