@@ -26,27 +26,33 @@ import "./AdminLayout.css";
 
 const { Sider, Header, Content } = Layout;
 
-const items: MenuProps["items"] = [
+// Every entry except "Tableau de bord" and "Paramètres" maps to a module in
+// the intra-staff permission matrix (back/config/permissions.php) — a role
+// with 'none' on that module never sees the menu entry at all.
+const allItems: (NonNullable<MenuProps["items"]>[number] & { module?: string })[] = [
   {
     key: "/dashboard",
     icon: <DashboardOutlined />,
     label: "Tableau de bord",
+    module: "dashboard",
   },
-  { key: "/dashboard/bornes", icon: <ThunderboltOutlined />, label: "Bornes" },
-  { key: "/dashboard/sessions", icon: <HistoryOutlined />, label: "Sessions" },
+  { key: "/dashboard/bornes", icon: <ThunderboltOutlined />, label: "Bornes", module: "bornes" },
+  { key: "/dashboard/sessions", icon: <HistoryOutlined />, label: "Sessions", module: "sessions" },
   {
     key: "/dashboard/utilisateurs",
     icon: <TeamOutlined />,
     label: "Utilisateurs",
+    module: "utilisateurs",
   },
-  { key: "/dashboard/vehicules", icon: <CarOutlined />, label: "Véhicules" },
+  { key: "/dashboard/vehicules", icon: <CarOutlined />, label: "Véhicules", module: "vehicules" },
   {
     key: "/dashboard/maintenance",
     icon: <ToolOutlined />,
     label: "Maintenance",
+    module: "maintenance",
   },
-  { key: "/dashboard/alertes", icon: <BellOutlined />, label: "Alertes" },
-  { key: "/dashboard/rapports", icon: <BarChartOutlined />, label: "Rapports" },
+  { key: "/dashboard/alertes", icon: <BellOutlined />, label: "Alertes", module: "alertes" },
+  { key: "/dashboard/rapports", icon: <BarChartOutlined />, label: "Rapports", module: "rapports" },
   {
     key: "/dashboard/parametres",
     icon: <SettingOutlined />,
@@ -56,6 +62,7 @@ const items: MenuProps["items"] = [
     key: "/dashboard/simulator",
     icon: <AndroidOutlined />,
     label: "Simulateur",
+    module: "simulateur",
   },
 ];
 
@@ -80,9 +87,14 @@ function AdminLayout() {
   const [sidebarOpen, setSidebarOpen] = useState(
     () => window.innerWidth > MOBILE_BREAKPOINT,
   );
-  const { user, logout } = useAuth()
+  const { user, logout, can } = useAuth()
   const location = useLocation();
   const navigate = useNavigate();
+
+  const items = useMemo(
+    () => allItems.filter((item) => !item.module || can(item.module)),
+    [can],
+  );
 
   const selectedKey = useMemo(() => {
     const match = Object.keys(titles)

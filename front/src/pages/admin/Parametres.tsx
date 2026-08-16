@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Form, Input, InputNumber, Select, Switch, Button, message, Spin } from 'antd'
 import { getTarif, updateTarif } from '../../api/tarifs'
+import { useAuth } from '../../context/AuthContext'
 
 function TarifSettings() {
+  const { can } = useAuth()
+  const canWrite = can('tarif', 'full')
   const [form] = Form.useForm()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -36,7 +39,7 @@ function TarifSettings() {
           <Spin />
         </div>
       ) : (
-        <Form form={form} layout="vertical" onFinish={(v) => void handleSave(v)}>
+        <Form form={form} layout="vertical" onFinish={(v) => void handleSave(v)} disabled={!canWrite}>
           <Form.Item
             label="Prix par kWh (DT)"
             name="prixKwh"
@@ -45,9 +48,11 @@ function TarifSettings() {
             <InputNumber min={0} step={0.01} precision={3} style={{ width: 200 }} />
           </Form.Item>
 
-          <Button type="primary" htmlType="submit" loading={saving}>
-            Enregistrer le tarif
-          </Button>
+          {canWrite && (
+            <Button type="primary" htmlType="submit" loading={saving}>
+              Enregistrer le tarif
+            </Button>
+          )}
         </Form>
       )}
     </div>
@@ -55,11 +60,12 @@ function TarifSettings() {
 }
 
 function Parametres() {
+  const { can } = useAuth()
   const [form] = Form.useForm()
 
   return (
     <div>
-      <TarifSettings />
+      {can('tarif') && <TarifSettings />}
 
       <div className="panel" style={{ maxWidth: 640 }}>
         <div className="panel__head">

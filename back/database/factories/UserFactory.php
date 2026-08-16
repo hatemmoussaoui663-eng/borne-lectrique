@@ -50,8 +50,17 @@ class UserFactory extends Factory
      */
     public function client(): static
     {
+        return $this->asRole('client', 'Client');
+    }
+
+    /**
+     * Give the user an arbitrary role by its slug — mainly for exercising the
+     * intra-staff permission matrix (config/permissions.php) in tests.
+     */
+    public function asRole(string $name, ?string $displayName = null): static
+    {
         return $this->state(fn (array $attributes) => [
-            'role_id' => Role::firstOrCreate(['name' => 'client'], ['display_name' => 'Client'])->id,
+            'role_id' => Role::firstOrCreate(['name' => $name], ['display_name' => $displayName ?? ucfirst($name)])->id,
         ]);
     }
 }

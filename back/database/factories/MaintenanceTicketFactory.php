@@ -23,7 +23,7 @@ class MaintenanceTicketFactory extends Factory
             'titre' => $this->faker->sentence(4),
             'priorite' => $this->faker->randomElement(['Basse', 'Moyenne', 'Haute', 'Critique']),
             'statut' => $this->faker->randomElement(['Ouvert', 'Planifié', 'En cours', 'Résolu']),
-            'technicien' => $this->faker->name(),
+            'technicien_id' => null,
             'pieces_remplacees' => [],
         ];
     }

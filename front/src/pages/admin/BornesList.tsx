@@ -7,6 +7,7 @@ import StatusTag from '../../components/admin/StatusTag'
 import BornesMap from '../../components/admin/BornesMap'
 import { apiClient } from '../../api/client'
 import { echo } from '../../echo'
+import { useAuth } from '../../context/AuthContext'
 import type { Borne, BorneEtat } from '../../types'
 
 const etatOptions: BorneEtat[] = [
@@ -49,6 +50,8 @@ function upsertById(list: Borne[], incoming: Borne): Borne[] {
 }
 
 function BornesList() {
+  const { can } = useAuth()
+  const canWrite = can('bornes', 'full')
   const [bornes, setBornes] = useState<Borne[]>([])
   const [search, setSearch] = useState('')
   const [etatFilter, setEtatFilter] = useState<BorneEtat | undefined>()
@@ -229,9 +232,11 @@ function BornesList() {
               Détail
             </Button>
           </Link>
-          <Button size="small" danger icon={<DeleteOutlined />} onClick={() => void handleDelete(record.id)}>
-            Supprimer
-          </Button>
+          {canWrite && (
+            <Button size="small" danger icon={<DeleteOutlined />} onClick={() => void handleDelete(record.id)}>
+              Supprimer
+            </Button>
+          )}
         </div>
       ),
     },
@@ -258,13 +263,15 @@ function BornesList() {
             options={etatOptions.map((e) => ({ label: e, value: e }))}
           />
         </div>
-        <Button
-          type="primary"
-          icon={<PlusOutlined />}
-          onClick={() => void handleCreate()}
-        >
-          Ajouter une borne
-        </Button>
+        {canWrite && (
+          <Button
+            type="primary"
+            icon={<PlusOutlined />}
+            onClick={() => void handleCreate()}
+          >
+            Ajouter une borne
+          </Button>
+        )}
       </div>
 
       <Modal

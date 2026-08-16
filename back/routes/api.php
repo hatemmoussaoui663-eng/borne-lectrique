@@ -10,6 +10,7 @@ use App\Http\Controllers\MeController;
 use App\Http\Controllers\OcppCommandController;
 use App\Http\Controllers\OcppIngestController;
 use App\Http\Controllers\RapportController;
+use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SimulatorController;
 use App\Http\Controllers\TarifController;
 use App\Http\Controllers\UserController;
@@ -41,32 +42,70 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     // Operator/admin back-office: forbidden to the "Client" role even with a
-    // valid token (see EnsureStaffRole) — the frontend's route guards are not
-    // the only thing standing between a client's session and this data.
+    // valid token (see EnsureStaffRole). Within staff, `permission:<module>`
+    // (see config/permissions.php, cahier des charges §7) further restricts
+    // each route to the roles allowed to read/write that specific module —
+    // e.g. a Technicien can write Maintenance but only read Bornes.
     Route::middleware('staff')->group(function () {
-        Route::apiResource('bornes', BorneController::class)->except(['index', 'show']);
-        Route::apiResource('users', UserController::class);
-        Route::put('/users/{user}/badge', [UserController::class, 'updateBadge']);
-        Route::get('/sessions', [ChargeSessionController::class, 'index']);
-        Route::get('/dashboard', [DashboardController::class, 'index']);
-        Route::get('/alertes', [AlerteController::class, 'index']);
-        Route::patch('/alertes/{alerte}/read', [AlerteController::class, 'markRead']);
-        Route::get('/tarif', [TarifController::class, 'show']);
-        Route::put('/tarif', [TarifController::class, 'update']);
-        Route::apiResource('vehicules', VehiculeController::class)->except(['show']);
-        Route::apiResource('maintenance-tickets', MaintenanceTicketController::class)->except(['show']);
-        Route::get('/rapports/export', [RapportController::class, 'exportSessions']);
+        Route::middleware('permission:bornes')->group(function () {
+            Route::apiResource('bornes', BorneController::class)->except(['index', 'show']);
+        });
+
+        Route::middleware('permission:utilisateurs')->group(function () {
+            Route::apiResource('users', UserController::class)->except(['store']);
+            Route::put('/users/{user}/badge', [UserController::class, 'updateBadge']);
+            Route::get('/roles', [RoleController::class, 'index']);
+        });
+
+        // Creating accounts (for any role) and creating roles themselves are
+        // both reserved to the Super Administrateur — Exploitant/Service Client
+        // keep 'full' read/update/delete access to /users above, but can no
+        // longer create new accounts or roles themselves.
+        Route::middleware('super_admin')->group(function () {
+            Route::post('/users', [UserController::class, 'store']);
+            Route::post('/roles', [RoleController::class, 'store']);
+        });
+
+        Route::middleware('permission:sessions')->group(function () {
+            Route::get('/sessions', [ChargeSessionController::class, 'index']);
+        });
+
+        Route::middleware('permission:dashboard')->group(function () {
+            Route::get('/dashboard', [DashboardController::class, 'index']);
+        });
+
+        Route::middleware('permission:alertes')->group(function () {
+            Route::get('/alertes', [AlerteController::class, 'index']);
+            Route::patch('/alertes/{alerte}/read', [AlerteController::class, 'markRead']);
+        });
+
+        Route::middleware('permission:tarif')->group(function () {
+            Route::get('/tarif', [TarifController::class, 'show']);
+            Route::put('/tarif', [TarifController::class, 'update']);
+        });
+
+        Route::middleware('permission:vehicules')->group(function () {
+            Route::apiResource('vehicules', VehiculeController::class)->except(['show']);
+        });
+
+        Route::middleware('permission:maintenance')->group(function () {
+            Route::apiResource('maintenance-tickets', MaintenanceTicketController::class)->except(['show']);
+        });
+
+        Route::middleware('permission:rapports')->group(function () {
+            Route::get('/rapports/export', [RapportController::class, 'exportSessions']);
+        });
 
         // Commandes OCPP sortantes (Module 6) — actions envoyées à la borne,
         // pas des événements qu'elle rapporte.
-        Route::prefix('bornes/{borne}/commands')->group(function () {
+        Route::middleware('permission:commandes_ocpp')->prefix('bornes/{borne}/commands')->group(function () {
             Route::post('/remote-start', [OcppCommandController::class, 'remoteStart']);
             Route::post('/remote-stop', [OcppCommandController::class, 'remoteStop']);
             Route::post('/unlock-connector', [OcppCommandController::class, 'unlockConnector']);
             Route::post('/reset', [OcppCommandController::class, 'reset']);
         });
 
-        Route::prefix('simulator')->group(function () {
+        Route::middleware('permission:simulateur')->prefix('simulator')->group(function () {
             Route::get('/status', [SimulatorController::class, 'status']);
             Route::post('/start', [SimulatorController::class, 'start']);
             Route::post('/stop', [SimulatorController::class, 'stop']);

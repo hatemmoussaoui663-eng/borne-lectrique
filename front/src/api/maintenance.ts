@@ -6,7 +6,7 @@ export interface TicketInput {
   titre: string
   priorite: TicketPriorite
   statut?: TicketStatut
-  technicien?: string
+  technicienId?: string | null
   piecesRemplacees?: string[]
 }
 
@@ -16,7 +16,7 @@ function toPayload(input: Partial<TicketInput>) {
     titre: input.titre,
     priorite: input.priorite,
     statut: input.statut,
-    technicien: input.technicien,
+    technicien_id: input.technicienId || null,
     pieces_remplacees: input.piecesRemplacees,
   }
 }

@@ -19,6 +19,18 @@ class StaffRoleGateTest extends TestCase
         $this->actingAs($client, 'sanctum')->postJson('/api/bornes', ['name' => 'X'])->assertForbidden();
     }
 
+    /**
+     * Cahier des charges §7 matrix, Maintenance row: Client = "Non" (no
+     * access at all), unlike Bornes where Client gets read-only access.
+     */
+    public function test_a_client_cannot_reach_maintenance_tickets(): void
+    {
+        $client = User::factory()->client()->create();
+
+        $this->actingAs($client, 'sanctum')->getJson('/api/maintenance-tickets')->assertForbidden();
+        $this->actingAs($client, 'sanctum')->postJson('/api/maintenance-tickets', ['titre' => 'X'])->assertForbidden();
+    }
+
     public function test_a_client_can_still_reach_the_read_only_bornes_list_and_me_endpoints(): void
     {
         $client = User::factory()->client()->create();

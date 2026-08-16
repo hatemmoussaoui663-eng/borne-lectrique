@@ -61,7 +61,12 @@ export type UserRole =
   | 'Opérateur'
   | 'Technicien'
   | 'Service Client'
+  | 'Finance'
   | 'Client'
+
+export type PermissionLevel = 'full' | 'read' | 'none'
+
+export type Permissions = Record<string, PermissionLevel>
 
 export type BadgeStatut = 'Actif' | 'Bloqué' | 'Expiré'
 
@@ -116,6 +121,7 @@ export interface TicketMaintenance {
   priorite: TicketPriorite
   statut: TicketStatut
   technicien: string
+  technicienId: string | null
   creeLe: string
   piecesRemplacees: string[]
 }

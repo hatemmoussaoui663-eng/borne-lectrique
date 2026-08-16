@@ -3,11 +3,14 @@ import { Table, Tag, Button, Modal, Form, Input, InputNumber, Select, message, P
 import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
 import { getVehicules, createVehicule, updateVehicule, deleteVehicule, type VehiculeInput } from '../../api/vehicules'
 import { getUsers } from '../../api/users'
+import { useAuth } from '../../context/AuthContext'
 import type { AppUser, ConnecteurType, Vehicule } from '../../types'
 
 const connecteurOptions: ConnecteurType[] = ['CCS', 'Type2', 'CHAdeMO', 'AC', 'DC']
 
 function Vehicules() {
+  const { can } = useAuth()
+  const canWrite = can('vehicules', 'full')
   const [vehicules, setVehicules] = useState<Vehicule[]>([])
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -89,31 +92,37 @@ function Vehicules() {
     { title: 'Immatriculation', dataIndex: 'immatriculation' },
     { title: 'Connecteur', dataIndex: 'connecteur', render: (v: string) => <Tag>{v}</Tag> },
     { title: 'Capacité batterie', dataIndex: 'capaciteKwh', render: (v: number) => `${v} kWh` },
-    {
-      title: '',
-      dataIndex: 'action',
-      render: (_: unknown, r: Vehicule) => (
-        <div style={{ display: 'flex', gap: 8 }}>
-          <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
-            Modifier
-          </Button>
-          <Popconfirm title="Supprimer ce véhicule ?" onConfirm={() => void handleDelete(r.id)}>
-            <Button size="small" danger icon={<DeleteOutlined />}>
-              Supprimer
-            </Button>
-          </Popconfirm>
-        </div>
-      ),
-    },
+    ...(canWrite
+      ? [
+          {
+            title: '',
+            dataIndex: 'action',
+            render: (_: unknown, r: Vehicule) => (
+              <div style={{ display: 'flex', gap: 8 }}>
+                <Button size="small" icon={<EditOutlined />} onClick={() => openEdit(r)}>
+                  Modifier
+                </Button>
+                <Popconfirm title="Supprimer ce véhicule ?" onConfirm={() => void handleDelete(r.id)}>
+                  <Button size="small" danger icon={<DeleteOutlined />}>
+                    Supprimer
+                  </Button>
+                </Popconfirm>
+              </div>
+            ),
+          },
+        ]
+      : []),
   ]
 
   return (
     <div>
       <div className="page-toolbar">
         <p style={{ margin: 0 }}>Véhicules électriques associés aux utilisateurs.</p>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Ajouter un véhicule
-        </Button>
+        {canWrite && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Ajouter un véhicule
+          </Button>
+        )}
       </div>
 
       <div className="panel">

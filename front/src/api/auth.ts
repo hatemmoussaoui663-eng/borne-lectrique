@@ -1,5 +1,5 @@
 import { apiClient } from './client'
-import type { AuthUser } from '../types'
+import type { AuthUser, Permissions } from '../types'
 
 export interface LoginPayload {
   email: string
@@ -9,6 +9,7 @@ export interface LoginPayload {
 export interface LoginResponse {
   token: string
   user: AuthUser
+  permissions: Permissions
 }
 
 export async function login(payload: LoginPayload): Promise<LoginResponse> {
@@ -20,9 +21,14 @@ export async function logout(): Promise<void> {
   await apiClient.post('/auth/logout')
 }
 
-export async function fetchCurrentUser(): Promise<AuthUser> {
+export interface CurrentUser {
+  user: AuthUser
+  permissions: Permissions
+}
+
+export async function fetchCurrentUser(): Promise<CurrentUser> {
   const { data } = await apiClient.get('/auth/me')
-  return data.user
+  return data
 }
 
 export async function forgotPassword(email: string): Promise<void> {

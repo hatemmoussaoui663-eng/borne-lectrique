@@ -15,7 +15,7 @@ class MaintenanceTicket extends Model
         'titre',
         'priorite',
         'statut',
-        'technicien',
+        'technicien_id',
         'pieces_remplacees',
     ];
 
@@ -31,6 +31,11 @@ class MaintenanceTicket extends Model
         return $this->belongsTo(Borne::class);
     }
 
+    public function technicien()
+    {
+        return $this->belongsTo(User::class, 'technicien_id');
+    }
+
     public function toFrontendArray(): array
     {
         return [
@@ -39,7 +44,8 @@ class MaintenanceTicket extends Model
             'titre' => $this->titre,
             'priorite' => $this->priorite,
             'statut' => $this->statut,
-            'technicien' => $this->technicien ?? '',
+            'technicien' => $this->technicien?->name ?? '',
+            'technicienId' => $this->technicien_id ? (string) $this->technicien_id : null,
             'creeLe' => $this->created_at ? $this->created_at->toDateString() : null,
             'piecesRemplacees' => $this->pieces_remplacees ?? [],
         ];

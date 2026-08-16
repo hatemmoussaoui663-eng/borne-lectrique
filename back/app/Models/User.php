@@ -50,4 +50,32 @@ class User extends Authenticatable
     {
         return $this->hasMany(Vehicule::class);
     }
+
+    /**
+     * This user's access level ('full' | 'read' | 'none') for a given module,
+     * per the intra-staff permission matrix (config/permissions.php, cahier
+     * des charges §7). Roles not present in the matrix (e.g. "client", which
+     * is gated out entirely before reaching these modules) default to 'none'.
+     */
+    public function permissionFor(string $module): string
+    {
+        $roleName = $this->role?->name;
+        $roleMatrix = config("permissions.roles.{$roleName}", []);
+
+        return $roleMatrix['*'] ?? $roleMatrix[$module] ?? 'none';
+    }
+
+    /**
+     * This user's full permission map, one level per configured module —
+     * what the frontend uses to hide/disable actions it already knows the
+     * API would reject.
+     */
+    public function permissions(): array
+    {
+        $modules = array_keys(config('permissions.roles.exploitant', []));
+
+        return collect($modules)->mapWithKeys(fn (string $module) => [
+            $module => $this->permissionFor($module),
+        ])->all();
+    }
 }

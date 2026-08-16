@@ -4,7 +4,10 @@ import { PlusOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/ico
 import StatusTag from '../../components/admin/StatusTag'
 import { getTickets, createTicket, updateTicketStatut, type TicketInput } from '../../api/maintenance'
 import { getBorneOptions, type BorneOption } from '../../api/bornes'
-import type { TicketMaintenance, TicketPriorite, TicketStatut } from '../../types'
+import { getUsers } from '../../api/users'
+import { useAuth } from '../../context/AuthContext'
+import { echo } from '../../echo'
+import type { AppUser, TicketMaintenance, TicketPriorite, TicketStatut } from '../../types'
 import './Maintenance.css'
 
 const columns: TicketStatut[] = ['Ouvert', 'Planifié', 'En cours', 'Résolu']
@@ -17,9 +20,21 @@ const priorityColor: Record<string, string> = {
   Basse: 'default',
 }
 
+function upsertById(list: TicketMaintenance[], incoming: TicketMaintenance): TicketMaintenance[] {
+  const index = list.findIndex((t) => t.id === incoming.id)
+  if (index === -1) return [incoming, ...list]
+  const next = [...list]
+  next[index] = incoming
+  return next
+}
+
 function Maintenance() {
+  const { can, user } = useAuth()
+  const canWrite = can('maintenance', 'full')
+  const isTechnicien = user?.role_slug === 'technicien'
   const [tickets, setTickets] = useState<TicketMaintenance[]>([])
   const [bornes, setBornes] = useState<BorneOption[]>([])
+  const [techniciens, setTechniciens] = useState<AppUser[]>([])
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [form] = Form.useForm<TicketInput>()
@@ -32,10 +47,30 @@ function Maintenance() {
     } catch {
       message.error('Impossible de charger les tickets de maintenance depuis le backend.')
     }
+
+    // Only Exploitant/Admin assign a technicien at creation — a Technicien is
+    // always auto-assigned to themself server-side and has no /users access.
+    if (!isTechnicien) {
+      try {
+        setTechniciens((await getUsers()).filter((u) => u.role === 'Technicien'))
+      } catch {
+        // non-fatal: the assignment dropdown will just be empty
+      }
+    }
   }
 
   useEffect(() => {
     void load()
+
+    const channel = echo.channel('maintenance-updates')
+    channel.listen('.maintenance.updated', (payload: TicketMaintenance) => {
+      setTickets((current) => upsertById(current, payload))
+    })
+
+    return () => {
+      echo.leaveChannel('maintenance-updates')
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   function openCreate() {
@@ -47,7 +82,7 @@ function Maintenance() {
     try {
       setSaving(true)
       const created = await createTicket(values)
-      setTickets((prev) => [created, ...prev])
+      setTickets((prev) => upsertById(prev, created))
       setModalOpen(false)
       message.success('Ticket créé.')
     } catch {
@@ -60,19 +95,30 @@ function Maintenance() {
   async function handleStatutChange(ticket: TicketMaintenance, statut: TicketStatut) {
     try {
       const updated = await updateTicketStatut(ticket.id, statut)
-      setTickets((prev) => prev.map((t) => (t.id === updated.id ? updated : t)))
+      setTickets((prev) => upsertById(prev, updated))
     } catch {
       message.error('Impossible de changer le statut du ticket.')
     }
+  }
+
+  function canEditStatut(ticket: TicketMaintenance): boolean {
+    if (!canWrite) return false
+    if (!isTechnicien) return true
+    // AuthUser.id is typed as string but the API serializes it as a JSON
+    // number, so compare via String() rather than risk a strict-equality
+    // mismatch against ticket.technicienId (already a string from Eloquent casting).
+    return user !== null && ticket.technicienId === String(user?.id)
   }
 
   return (
     <div>
       <div className="page-toolbar">
         <p style={{ margin: 0 }}>Ordres de travail et suivi des interventions par borne.</p>
-        <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
-          Créer un ticket
-        </Button>
+        {canWrite && (
+          <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
+            Créer un ticket
+          </Button>
+        )}
       </div>
 
       <div className="maintenance-board">
@@ -109,13 +155,19 @@ function Maintenance() {
                       ))}
                     </div>
                   )}
-                  <Select
-                    size="small"
-                    style={{ width: '100%', marginTop: 8 }}
-                    value={t.statut}
-                    options={columns.map((c) => ({ label: c, value: c }))}
-                    onChange={(v) => void handleStatutChange(t, v)}
-                  />
+                  {canEditStatut(t) ? (
+                    <Select
+                      size="small"
+                      style={{ width: '100%', marginTop: 8 }}
+                      value={t.statut}
+                      options={columns.map((c) => ({ label: c, value: c }))}
+                      onChange={(v) => void handleStatutChange(t, v)}
+                    />
+                  ) : (
+                    <div style={{ marginTop: 8 }}>
+                      <StatusTag value={t.statut} />
+                    </div>
+                  )}
                 </div>
               ))}
           </div>
@@ -178,12 +230,28 @@ function Maintenance() {
           <Form.Item label="Titre" name="titre" rules={[{ required: true, message: 'Le titre est requis' }]}>
             <Input placeholder="Description de l'intervention" />
           </Form.Item>
-          <Form.Item label="Priorité" name="priorite" initialValue="Moyenne" rules={[{ required: true }]}>
+          <Form.Item
+            label="Priorité"
+            name="priorite"
+            initialValue="Moyenne"
+            rules={[{ required: true }]}
+            extra="Une priorité Critique marque la borne « en panne » pour tous les rôles jusqu'à résolution."
+          >
             <Select options={prioriteOptions.map((p) => ({ label: p, value: p }))} />
           </Form.Item>
-          <Form.Item label="Technicien" name="technicien">
-            <Input placeholder="Nom du technicien" />
-          </Form.Item>
+          {isTechnicien ? (
+            <Form.Item label="Technicien">
+              <Input value={user?.name} disabled />
+            </Form.Item>
+          ) : (
+            <Form.Item label="Technicien assigné" name="technicienId">
+              <Select
+                allowClear
+                placeholder="Non assigné"
+                options={techniciens.map((t) => ({ label: t.nom, value: t.id }))}
+              />
+            </Form.Item>
+          )}
         </Form>
       </Modal>
     </div>

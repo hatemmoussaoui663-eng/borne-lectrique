@@ -19,6 +19,27 @@ export async function getUsers(): Promise<AppUser[]> {
   return data.map(toAppUser)
 }
 
+export interface CreateUserInput {
+  name: string
+  email: string
+  phone?: string
+  roleId: number
+  isActive: boolean
+  password: string
+}
+
+export async function createUser(input: CreateUserInput): Promise<AppUser> {
+  const { data } = await apiClient.post<AuthUser>('/users', {
+    name: input.name,
+    email: input.email,
+    phone: input.phone || null,
+    role_id: input.roleId,
+    is_active: input.isActive,
+    password: input.password,
+  })
+  return toAppUser(data)
+}
+
 export interface BadgeInput {
   code: string
   status?: BadgeStatut

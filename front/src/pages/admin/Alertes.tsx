@@ -3,6 +3,7 @@ import { Button, Select, Tag, Spin } from 'antd'
 import { CheckOutlined, WarningOutlined, InfoCircleOutlined, ExclamationCircleOutlined } from '@ant-design/icons'
 import { getAlertes, markAlerteRead } from '../../api/alertes'
 import { echo } from '../../echo'
+import { useAuth } from '../../context/AuthContext'
 import type { Alerte, AlerteSeverite } from '../../types'
 
 const severityMeta: Record<AlerteSeverite, { label: string; color: string; icon: ReactNode }> = {
@@ -22,6 +23,8 @@ function upsertById(list: Alerte[], incoming: Alerte): Alerte[] {
 }
 
 function Alertes() {
+  const { can } = useAuth()
+  const canWrite = can('alertes', 'full')
   const [items, setItems] = useState<Alerte[]>([])
   const [loading, setLoading] = useState(true)
   const [severityFilter, setSeverityFilter] = useState<AlerteSeverite | undefined>()
@@ -68,7 +71,7 @@ function Alertes() {
           onChange={setSeverityFilter}
           options={Object.entries(severityMeta).map(([value, meta]) => ({ label: meta.label, value }))}
         />
-        <Button onClick={() => void markAllAsRead()}>Tout marquer comme lu</Button>
+        {canWrite && <Button onClick={() => void markAllAsRead()}>Tout marquer comme lu</Button>}
       </div>
 
       <div className="panel" style={{ padding: 0 }}>
@@ -115,7 +118,7 @@ function Alertes() {
                     </span>
                   </div>
                   <Tag color={meta.color}>{meta.label}</Tag>
-                  {!a.lue && (
+                  {!a.lue && canWrite && (
                     <Button size="small" icon={<CheckOutlined />} onClick={() => void markAsRead(a.id)}>
                       Marquer comme lu
                     </Button>

@@ -13,6 +13,7 @@ import {
 import StatusTag from '../../components/admin/StatusTag'
 import { apiClient } from '../../api/client'
 import { remoteStart, remoteStop, unlockConnector, resetBorne } from '../../api/commands'
+import { useAuth } from '../../context/AuthContext'
 import { sessions } from '../../mock/data'
 import type { Borne, Connecteur } from '../../types'
 
@@ -25,10 +26,12 @@ function commandErrorMessage(error: unknown, fallback: string): string {
 }
 
 function ConnectorActions({ borneId, connecteur }: { borneId: string; connecteur: Connecteur }) {
+  const { can } = useAuth()
   const [startModalOpen, setStartModalOpen] = useState(false)
   const [idTag, setIdTag] = useState('')
   const [busy, setBusy] = useState(false)
   const connectorId = Number(connecteur.id)
+  const canCommand = can('commandes_ocpp', 'full')
 
   async function handleStart() {
     try {
@@ -66,6 +69,10 @@ function ConnectorActions({ borneId, connecteur }: { borneId: string; connecteur
     } finally {
       setBusy(false)
     }
+  }
+
+  if (!canCommand) {
+    return null
   }
 
   return (
@@ -108,6 +115,9 @@ function ConnectorActions({ borneId, connecteur }: { borneId: string; connecteur
 
 function BorneDetail() {
   const { id } = useParams()
+  const { can } = useAuth()
+  const canCommand = can('commandes_ocpp', 'full')
+  const canMaintenance = can('maintenance', 'full')
   const [borne, setBorne] = useState<Borne | null>(null)
   const [loading, setLoading] = useState(true)
   const [resetting, setResetting] = useState(false)
@@ -183,12 +193,14 @@ function BorneDetail() {
         </div>
         <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
           <StatusTag value={borne.etat} />
-          <Dropdown menu={resetMenu} trigger={['click']}>
-            <Button icon={<ReloadOutlined />} loading={resetting}>
-              Redémarrer
-            </Button>
-          </Dropdown>
-          <Button icon={<ToolOutlined />}>Créer un ticket</Button>
+          {canCommand && (
+            <Dropdown menu={resetMenu} trigger={['click']}>
+              <Button icon={<ReloadOutlined />} loading={resetting}>
+                Redémarrer
+              </Button>
+            </Dropdown>
+          )}
+          {canMaintenance && <Button icon={<ToolOutlined />}>Créer un ticket</Button>}
         </div>
       </div>
 
