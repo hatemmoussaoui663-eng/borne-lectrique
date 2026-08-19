@@ -35,3 +35,10 @@ export async function updateTicketStatut(id: string, statut: TicketStatut): Prom
   const { data } = await apiClient.put<TicketMaintenance>(`/maintenance-tickets/${id}`, { statut })
   return data
 }
+
+export async function updateTicketPieces(id: string, piecesRemplacees: string[]): Promise<TicketMaintenance> {
+  const { data } = await apiClient.put<TicketMaintenance>(`/maintenance-tickets/${id}`, {
+    pieces_remplacees: piecesRemplacees,
+  })
+  return data
+}

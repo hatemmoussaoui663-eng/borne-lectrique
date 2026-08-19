@@ -1,9 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Table, Input, Select, Button, message, Tag, Modal, DatePicker, Form, Switch } from 'antd'
-import { SearchOutlined, PlusOutlined, CreditCardOutlined, IdcardOutlined } from '@ant-design/icons'
+import { Table, Input, Select, Button, message, Tag, Modal, DatePicker, Form, Switch, Popconfirm } from 'antd'
+import {
+  SearchOutlined,
+  PlusOutlined,
+  CreditCardOutlined,
+  IdcardOutlined,
+  EditOutlined,
+  DeleteOutlined,
+} from '@ant-design/icons'
 import dayjs, { type Dayjs } from 'dayjs'
 import StatusTag from '../../components/admin/StatusTag'
-import { getUsers, updateUserBadge, createUser, type CreateUserInput } from '../../api/users'
+import {
+  getUsers,
+  updateUserBadge,
+  createUser,
+  updateUser,
+  deleteUser,
+  type CreateUserInput,
+  type UpdateUserInput,
+} from '../../api/users'
 import { getRoles, type Role } from '../../api/roles'
 import { useAuth } from '../../context/AuthContext'
 import type { AppUser, BadgeStatut, UserRole } from '../../types'
@@ -34,12 +49,22 @@ interface CreateFormValues {
   password: string
 }
 
+interface EditFormValues {
+  name: string
+  email: string
+  phone?: string
+  roleId: number
+  isActive: boolean
+  password?: string
+}
+
 function Utilisateurs() {
   const { can, user } = useAuth()
   const canWrite = can('utilisateurs', 'full')
-  // Account creation is reserved to the Super Administrateur even though
-  // Exploitant/Service Client have full read/update access to /users.
-  const canCreateUser = user?.role_slug === 'super_admin'
+  // Account CRUD (create/edit/delete) is reserved to the Super Administrateur
+  // even though Exploitant/Service Client have full read access to /users
+  // and can still manage RFID badges (a separate, more operational task).
+  const canManageAccounts = user?.role_slug === 'super_admin'
   const [users, setUsers] = useState<AppUser[]>([])
   const [roles, setRoles] = useState<Role[]>([])
   const [search, setSearch] = useState('')
@@ -48,8 +73,12 @@ function Utilisateurs() {
   const [savingBadge, setSavingBadge] = useState(false)
   const [createModalOpen, setCreateModalOpen] = useState(false)
   const [savingUser, setSavingUser] = useState(false)
+  const [editUser, setEditUser] = useState<AppUser | null>(null)
+  const [savingEdit, setSavingEdit] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
   const [form] = Form.useForm<BadgeFormValues>()
   const [createForm] = Form.useForm<CreateFormValues>()
+  const [editForm] = Form.useForm<EditFormValues>()
 
   useEffect(() => {
     async function loadUsers() {
@@ -63,12 +92,13 @@ function Utilisateurs() {
 
     loadUsers()
 
-    if (canCreateUser) {
+    // Needed for both the create and edit forms' role picker — both are Admin-only.
+    if (canManageAccounts) {
       void getRoles()
         .then(setRoles)
         .catch(() => message.error('Impossible de charger la liste des rôles.'))
     }
-  }, [canCreateUser])
+  }, [canManageAccounts])
 
   function openCreateModal() {
     createForm.resetFields()
@@ -95,6 +125,54 @@ function Utilisateurs() {
       message.error('Création impossible (email déjà utilisé ?).')
     } finally {
       setSavingUser(false)
+    }
+  }
+
+  function openEditModal(target: AppUser) {
+    setEditUser(target)
+    editForm.resetFields()
+    editForm.setFieldsValue({
+      name: target.nom,
+      email: target.email,
+      phone: target.phone ?? undefined,
+      roleId: roles.find((r) => r.displayName === target.role)?.id,
+      isActive: target.statut === 'Actif',
+    })
+  }
+
+  async function handleEditUser(values: EditFormValues) {
+    if (!editUser) return
+    try {
+      setSavingEdit(true)
+      const input: UpdateUserInput = {
+        name: values.name,
+        email: values.email,
+        phone: values.phone,
+        roleId: values.roleId,
+        isActive: values.isActive,
+        password: values.password,
+      }
+      const updated = await updateUser(editUser.id, input)
+      setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)))
+      setEditUser(null)
+      message.success('Utilisateur mis à jour.')
+    } catch {
+      message.error('Mise à jour impossible (email déjà utilisé ?).')
+    } finally {
+      setSavingEdit(false)
+    }
+  }
+
+  async function handleDeleteUser(target: AppUser) {
+    try {
+      setDeletingId(target.id)
+      await deleteUser(target.id)
+      setUsers((prev) => prev.filter((u) => u.id !== target.id))
+      message.success('Utilisateur supprimé.')
+    } catch {
+      message.error('Suppression impossible.')
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -203,6 +281,47 @@ function Utilisateurs() {
       dataIndex: 'inscrit',
       render: (value: string) => value || '-',
     },
+    ...(canManageAccounts
+      ? [
+          {
+            title: 'Actions',
+            dataIndex: 'actions',
+            render: (_: unknown, r: AppUser) => {
+              const isSelf = r.id === user?.id
+              return (
+                <div style={{ display: 'flex', gap: 4 }}>
+                  <Button
+                    size="small"
+                    type="text"
+                    icon={<EditOutlined />}
+                    onClick={() => openEditModal(r)}
+                    aria-label="Modifier"
+                  />
+                  <Popconfirm
+                    title="Supprimer cet utilisateur ?"
+                    description={isSelf ? 'Vous ne pouvez pas supprimer votre propre compte.' : undefined}
+                    onConfirm={() => void handleDeleteUser(r)}
+                    okText="Supprimer"
+                    cancelText="Annuler"
+                    okButtonProps={{ danger: true }}
+                    disabled={isSelf}
+                  >
+                    <Button
+                      size="small"
+                      type="text"
+                      danger
+                      icon={<DeleteOutlined />}
+                      loading={deletingId === r.id}
+                      disabled={isSelf}
+                      aria-label="Supprimer"
+                    />
+                  </Popconfirm>
+                </div>
+              )
+            },
+          },
+        ]
+      : []),
   ]
 
   return (
@@ -226,7 +345,7 @@ function Utilisateurs() {
             options={roleOptions.map((r) => ({ label: r, value: r }))}
           />
         </div>
-        {canCreateUser && (
+        {canManageAccounts && (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreateModal}>
             Ajouter un utilisateur
           </Button>
@@ -248,8 +367,21 @@ function Utilisateurs() {
         destroyOnClose
       >
         <Form form={form} layout="vertical" onFinish={(v) => void saveBadge(v)}>
-          <Form.Item label="Numéro du badge (laisser vide pour détacher)" name="code">
-            <Input placeholder="Numéro du badge RFID" prefix={<IdcardOutlined />} />
+          <Form.Item
+            label={
+              badgeEditUser?.badge?.used
+                ? 'Numéro du badge (verrouillé — déjà utilisé pour une recharge)'
+                : badgeEditUser?.badge
+                  ? 'Numéro du badge (laisser vide pour détacher)'
+                  : 'Numéro du badge (laisser vide pour générer automatiquement)'
+            }
+            name="code"
+          >
+            <Input
+              placeholder={badgeEditUser?.badge ? 'Numéro du badge RFID' : 'Auto (RFID-XXXX)'}
+              prefix={<IdcardOutlined />}
+              disabled={badgeEditUser?.badge?.used}
+            />
           </Form.Item>
           <Form.Item label="Statut" name="status">
             <Select options={badgeStatutOptions.map((s) => ({ label: s, value: s }))} />
@@ -302,6 +434,52 @@ function Utilisateurs() {
             ]}
           >
             <Input.Password placeholder="Mot de passe initial" />
+          </Form.Item>
+          <Form.Item label="Compte actif" name="isActive" valuePropName="checked">
+            <Switch />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title={`Modifier — ${editUser?.nom ?? ''}`}
+        open={editUser !== null}
+        onCancel={() => setEditUser(null)}
+        onOk={() => editForm.submit()}
+        confirmLoading={savingEdit}
+        okText="Enregistrer"
+        cancelText="Annuler"
+        destroyOnClose
+      >
+        <Form form={editForm} layout="vertical" onFinish={(v) => void handleEditUser(v)}>
+          <Form.Item label="Nom complet" name="name" rules={[{ required: true, message: 'Le nom est requis' }]}>
+            <Input placeholder="Nom et prénom" />
+          </Form.Item>
+          <Form.Item
+            label="Email"
+            name="email"
+            rules={[
+              { required: true, message: "L'email est requis" },
+              { type: 'email', message: 'Email invalide' },
+            ]}
+          >
+            <Input placeholder="utilisateur@borne-electrique.com" />
+          </Form.Item>
+          <Form.Item label="Téléphone" name="phone">
+            <Input placeholder="+216 00 000 000" />
+          </Form.Item>
+          <Form.Item label="Rôle" name="roleId" rules={[{ required: true, message: 'Le rôle est requis' }]}>
+            <Select
+              placeholder="Sélectionner un rôle"
+              options={roles.map((r) => ({ label: r.displayName, value: r.id }))}
+            />
+          </Form.Item>
+          <Form.Item
+            label="Nouveau mot de passe (laisser vide pour ne pas changer)"
+            name="password"
+            rules={[{ min: 8, message: 'Au moins 8 caractères' }]}
+          >
+            <Input.Password placeholder="Mot de passe" />
           </Form.Item>
           <Form.Item label="Compte actif" name="isActive" valuePropName="checked">
             <Switch />

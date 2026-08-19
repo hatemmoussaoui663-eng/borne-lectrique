@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Table, Tag, Button, Modal, Form, Input, InputNumber, Select, message, Popconfirm } from 'antd'
-import { PlusOutlined, DeleteOutlined, EditOutlined } from '@ant-design/icons'
+import { PlusOutlined, DeleteOutlined, EditOutlined, IdcardOutlined } from '@ant-design/icons'
 import { getVehicules, createVehicule, updateVehicule, deleteVehicule, type VehiculeInput } from '../../api/vehicules'
 import { getUsers } from '../../api/users'
 import { useAuth } from '../../context/AuthContext'
@@ -9,8 +9,11 @@ import type { AppUser, ConnecteurType, Vehicule } from '../../types'
 const connecteurOptions: ConnecteurType[] = ['CCS', 'Type2', 'CHAdeMO', 'AC', 'DC']
 
 function Vehicules() {
-  const { can } = useAuth()
-  const canWrite = can('vehicules', 'full')
+  const { can, user } = useAuth()
+  // Vehicle management is an Exploitant task — Admin's usual "full access
+  // everywhere" is deliberately not extended here: read-only (see
+  // VehiculeController::ensureNotSuperAdmin on the backend).
+  const canWrite = can('vehicules', 'full') && user?.role_slug !== 'super_admin'
   const [vehicules, setVehicules] = useState<Vehicule[]>([])
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
@@ -84,6 +87,15 @@ function Vehicules() {
 
   const columns = [
     { title: 'Propriétaire', dataIndex: 'proprietaire', render: (v: string) => v || '—' },
+    {
+      title: 'Badge RFID',
+      dataIndex: 'badge',
+      render: (v: string | null) => (
+        <span style={{ display: 'inline-flex', alignItems: 'center', gap: 6, color: v ? 'var(--text-primary)' : 'var(--text-muted)' }}>
+          <IdcardOutlined /> {v || '—'}
+        </span>
+      ),
+    },
     {
       title: 'Véhicule',
       dataIndex: 'marque',

@@ -29,6 +29,7 @@ class Vehicule extends Model
         return [
             'id' => (string) $this->id,
             'proprietaire' => $this->user?->name ?? '',
+            'badge' => $this->user?->badge?->code ?? null,
             'marque' => $this->marque,
             'modele' => $this->modele,
             'immatriculation' => $this->immatriculation,

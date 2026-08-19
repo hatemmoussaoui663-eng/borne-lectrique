@@ -13,9 +13,13 @@ use Illuminate\Validation\Rule;
 
 /**
  * A "technicien" here is a real assignment (technicien_id -> users), not free
- * text: a user with that role can only touch the status of tickets assigned
- * to them, while anyone else with full Maintenance access (Exploitant,
- * Opérateur is read-only, Super Admin) can create/assign/edit any ticket.
+ * text: a Technicien is effectively read-only on a ticket's record — no
+ * create, retitle, reprioritize, reassign, or delete — except for tickets
+ * assigned to them, where they may move the statut (Ouvert -> ... -> Résolu)
+ * and log pieces_remplacees. Not even the Super Administrateur can shortcut
+ * that statut move. Everyone else with full Maintenance access (Exploitant,
+ * Admin) creates/assigns/retitles/prioritizes/deletes tickets, but the actual
+ * repair progress is the Technicien's call alone.
  */
 class MaintenanceTicketController extends Controller
 {
@@ -28,22 +32,24 @@ class MaintenanceTicketController extends Controller
 
     public function store(Request $request): JsonResponse
     {
-        $isTechnicien = $this->isTechnicien($request);
+        // Reporting/opening a ticket is an Exploitant/Admin action — a
+        // Technicien is read-only on tickets except for the statut/pieces of
+        // whatever's already assigned to them.
+        if ($this->isTechnicien($request)) {
+            abort(403, 'Seuls Exploitant et Admin peuvent créer un ticket de maintenance.');
+        }
 
         $data = $request->validate([
             'borne_id' => ['required', 'integer', Rule::exists('bornes', 'id')],
             'titre' => 'required|string|max:255',
             'priorite' => ['required', Rule::in(['Basse', 'Moyenne', 'Haute', 'Critique'])],
-            'statut' => ['sometimes', Rule::in(['Ouvert', 'Planifié', 'En cours', 'Résolu'])],
             'technicien_id' => ['sometimes', 'nullable', 'integer', Rule::exists('users', 'id')],
             'pieces_remplacees' => 'nullable|array',
             'pieces_remplacees.*' => 'string|max:100',
         ]);
 
-        // A Technicien reporting a breakdown is always assigned to themself —
-        // reassigning to someone else is an Exploitant/Admin decision.
-        $data['technicien_id'] = $isTechnicien ? $request->user()->id : ($data['technicien_id'] ?? null);
-        $data['statut'] ??= 'Ouvert';
+        $data['technicien_id'] ??= null;
+        $data['statut'] = 'Ouvert';
 
         $ticket = MaintenanceTicket::create($data);
         $ticket->load(['borne', 'technicien']);
@@ -63,18 +69,25 @@ class MaintenanceTicketController extends Controller
         }
 
         $rules = [
-            'statut' => ['sometimes', Rule::in(['Ouvert', 'Planifié', 'En cours', 'Résolu'])],
+            'pieces_remplacees' => 'nullable|array',
+            'pieces_remplacees.*' => 'string|max:100',
         ];
 
-        // A Technicien may only close out their own ticket's status — retitling,
-        // reprioritizing or reassigning it stays an Exploitant/Admin action.
+        // Only the assigned Technicien moves a ticket through its statut —
+        // Exploitant and Admin (and anyone else with full Maintenance access)
+        // create/assign/prioritize but don't resolve it themselves.
+        if ($isTechnicien) {
+            $rules['statut'] = ['sometimes', Rule::in(['Ouvert', 'Planifié', 'En cours', 'Résolu'])];
+        }
+
+        // A Technicien may only close out their own ticket's status and log the
+        // parts they replaced — retitling, reprioritizing or reassigning it
+        // stays an Exploitant/Admin action.
         if (! $isTechnicien) {
             $rules += [
                 'titre' => 'sometimes|required|string|max:255',
                 'priorite' => ['sometimes', Rule::in(['Basse', 'Moyenne', 'Haute', 'Critique'])],
                 'technicien_id' => ['sometimes', 'nullable', 'integer', Rule::exists('users', 'id')],
-                'pieces_remplacees' => 'nullable|array',
-                'pieces_remplacees.*' => 'string|max:100',
             ];
         }
 
@@ -89,8 +102,12 @@ class MaintenanceTicketController extends Controller
         return response()->json($maintenanceTicket->toFrontendArray());
     }
 
-    public function destroy(MaintenanceTicket $maintenanceTicket): JsonResponse
+    public function destroy(Request $request, MaintenanceTicket $maintenanceTicket): JsonResponse
     {
+        if ($this->isTechnicien($request)) {
+            abort(403, 'Seuls Exploitant et Admin peuvent supprimer un ticket de maintenance.');
+        }
+
         $maintenanceTicket->delete();
 
         return response()->json(['message' => 'Ticket supprimé.']);

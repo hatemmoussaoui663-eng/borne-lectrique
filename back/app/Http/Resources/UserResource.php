@@ -19,6 +19,7 @@ class UserResource extends JsonResource
                 'code' => $this->badge->code,
                 'status' => $this->badge->status,
                 'expiresAt' => $this->badge->expires_at?->toDateString(),
+                'used' => $this->badge->isUsed(),
             ]),
             'role' => $this->role->display_name,
             'role_slug' => $this->role->name,

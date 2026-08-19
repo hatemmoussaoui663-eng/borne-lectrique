@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Button, message, Tag, Modal, Form, Input, Select } from 'antd'
 import { PlusOutlined, UserOutlined, ThunderboltOutlined } from '@ant-design/icons'
 import StatusTag from '../../components/admin/StatusTag'
-import { getTickets, createTicket, updateTicketStatut, type TicketInput } from '../../api/maintenance'
+import { getTickets, createTicket, updateTicketStatut, updateTicketPieces, type TicketInput } from '../../api/maintenance'
 import { getBorneOptions, type BorneOption } from '../../api/bornes'
 import { getUsers } from '../../api/users'
 import { useAuth } from '../../context/AuthContext'
@@ -28,10 +29,76 @@ function upsertById(list: TicketMaintenance[], incoming: TicketMaintenance): Tic
   return next
 }
 
+/** Lets whoever is working the ticket (Technicien on their own, Exploitant/Admin on any) log which parts they replaced. */
+function PiecesEditor({
+  pieces,
+  editable,
+  onSave,
+}: {
+  pieces: string[]
+  editable: boolean
+  onSave: (pieces: string[]) => void
+}) {
+  const [inputVisible, setInputVisible] = useState(false)
+  const [inputValue, setInputValue] = useState('')
+
+  function removePiece(piece: string) {
+    onSave(pieces.filter((p) => p !== piece))
+  }
+
+  function commitInput() {
+    const value = inputValue.trim()
+    if (value && !pieces.includes(value)) {
+      onSave([...pieces, value])
+    }
+    setInputValue('')
+    setInputVisible(false)
+  }
+
+  if (!editable && pieces.length === 0) return null
+
+  return (
+    <div className="maintenance-card__pieces">
+      {pieces.map((p) =>
+        editable ? (
+          <Tag key={p} closable onClose={() => removePiece(p)}>
+            {p}
+          </Tag>
+        ) : (
+          <Tag key={p}>{p}</Tag>
+        ),
+      )}
+      {editable &&
+        (inputVisible ? (
+          <Input
+            size="small"
+            autoFocus
+            style={{ width: 110 }}
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onBlur={commitInput}
+            onPressEnter={commitInput}
+          />
+        ) : (
+          <Tag
+            onClick={() => setInputVisible(true)}
+            style={{ cursor: 'pointer', borderStyle: 'dashed' }}
+          >
+            <PlusOutlined /> Pièce
+          </Tag>
+        ))}
+    </div>
+  )
+}
+
 function Maintenance() {
   const { can, user } = useAuth()
+  const location = useLocation()
   const canWrite = can('maintenance', 'full')
   const isTechnicien = user?.role_slug === 'technicien'
+  // Reporting/opening a ticket is an Exploitant/Admin action — a Technicien
+  // is read-only on tickets except for the statut/pieces of their own.
+  const canCreateTicket = canWrite && !isTechnicien
   const [tickets, setTickets] = useState<TicketMaintenance[]>([])
   const [bornes, setBornes] = useState<BorneOption[]>([])
   const [techniciens, setTechniciens] = useState<AppUser[]>([])
@@ -73,6 +140,18 @@ function Maintenance() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  useEffect(() => {
+    // Arriving here via "Créer un ticket" from a borne's own page (BorneDetail):
+    // open the modal pre-filled with that borne once the options are loaded.
+    const state = location.state as { borneId?: string } | null
+    if (state?.borneId && bornes.some((b) => b.id === state.borneId)) {
+      form.resetFields()
+      form.setFieldsValue({ borneId: state.borneId })
+      setModalOpen(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [location.state, bornes])
+
   function openCreate() {
     form.resetFields()
     setModalOpen(true)
@@ -101,20 +180,40 @@ function Maintenance() {
     }
   }
 
+  async function handlePiecesChange(ticket: TicketMaintenance, pieces: string[]) {
+    try {
+      const updated = await updateTicketPieces(ticket.id, pieces)
+      setTickets((prev) => upsertById(prev, updated))
+    } catch {
+      message.error('Impossible de mettre à jour les pièces remplacées.')
+    }
+  }
+
+  // AuthUser.id is typed as string but the API serializes it as a JSON
+  // number, so compare via String() rather than risk a strict-equality
+  // mismatch against ticket.technicienId (already a string from Eloquent casting).
+  function isOwnTicket(ticket: TicketMaintenance): boolean {
+    return user !== null && ticket.technicienId === String(user?.id)
+  }
+
+  // Exploitant and Admin create/assign/prioritize tickets but don't resolve
+  // them — only the assigned Technicien moves a ticket through its statut.
   function canEditStatut(ticket: TicketMaintenance): boolean {
+    if (!isTechnicien) return false
+    return isOwnTicket(ticket)
+  }
+
+  function canEditPieces(ticket: TicketMaintenance): boolean {
     if (!canWrite) return false
     if (!isTechnicien) return true
-    // AuthUser.id is typed as string but the API serializes it as a JSON
-    // number, so compare via String() rather than risk a strict-equality
-    // mismatch against ticket.technicienId (already a string from Eloquent casting).
-    return user !== null && ticket.technicienId === String(user?.id)
+    return isOwnTicket(ticket)
   }
 
   return (
     <div>
       <div className="page-toolbar">
         <p style={{ margin: 0 }}>Ordres de travail et suivi des interventions par borne.</p>
-        {canWrite && (
+        {canCreateTicket && (
           <Button type="primary" icon={<PlusOutlined />} onClick={openCreate}>
             Créer un ticket
           </Button>
@@ -148,13 +247,11 @@ function Maintenance() {
                     </span>
                     <span>{t.creeLe}</span>
                   </div>
-                  {t.piecesRemplacees.length > 0 && (
-                    <div className="maintenance-card__pieces">
-                      {t.piecesRemplacees.map((p) => (
-                        <Tag key={p}>{p}</Tag>
-                      ))}
-                    </div>
-                  )}
+                  <PiecesEditor
+                    pieces={t.piecesRemplacees}
+                    editable={canEditPieces(t)}
+                    onSave={(pieces) => void handlePiecesChange(t, pieces)}
+                  />
                   {canEditStatut(t) ? (
                     <Select
                       size="small"

@@ -67,8 +67,12 @@ class UserController extends Controller
         return response()->json(new UserResource($user));
     }
 
-    public function destroy(User $user): JsonResponse
+    public function destroy(Request $request, User $user): JsonResponse
     {
+        if ($request->user()->id === $user->id) {
+            abort(422, 'Vous ne pouvez pas supprimer votre propre compte.');
+        }
+
         $user->delete();
 
         return response()->json(['message' => 'Utilisateur supprimé.']);
@@ -76,7 +80,11 @@ class UserController extends Controller
 
     /**
      * Associate, update, or detach the RFID badge for a user (Module 7).
-     * An empty `code` detaches/deletes the user's current badge.
+     * An empty `code` auto-generates a fresh one (Badge::nextCode()) when the
+     * user has none yet, or detaches the current badge when they do. Once a
+     * badge has authorized at least one charge session (Badge::isUsed()),
+     * its code can no longer be changed or detached — only status/expiry
+     * stay editable, e.g. to block a lost card.
      */
     public function updateBadge(Request $request, User $user): JsonResponse
     {
@@ -87,13 +95,24 @@ class UserController extends Controller
         ]);
 
         $user->load('badge');
+        $existing = $user->badge;
         $code = trim($data['code'] ?? '');
 
-        if ($code === '') {
-            $user->badge?->delete();
-            $user->load(['role', 'badge']);
+        if ($existing !== null && $existing->isUsed() && $code !== $existing->code) {
+            return response()->json([
+                'message' => 'Ce badge a déjà servi à une session de recharge : son numéro ne peut plus être modifié ni détaché.',
+            ], 422);
+        }
 
-            return response()->json(new UserResource($user));
+        if ($code === '') {
+            if ($existing === null) {
+                $code = Badge::nextCode();
+            } else {
+                $existing->delete();
+                $user->load(['role', 'badge']);
+
+                return response()->json(new UserResource($user));
+            }
         }
 
         $duplicate = Badge::where('code', $code)->where('user_id', '!=', $user->id)->exists();
@@ -101,7 +120,7 @@ class UserController extends Controller
             return response()->json(['message' => 'Ce badge est déjà associé à un autre utilisateur.'], 422);
         }
 
-        $badge = $user->badge ?? new Badge(['user_id' => $user->id]);
+        $badge = $existing ?? new Badge(['user_id' => $user->id]);
         $badge->fill([
             'code' => $code,
             'status' => $data['status'] ?? $badge->status ?? 'Actif',

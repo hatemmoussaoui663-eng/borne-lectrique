@@ -46,7 +46,7 @@ class MaintenanceTicketApiTest extends TestCase
             ->assertOk()
             ->assertJsonCount(1);
 
-        $update = $this->actingAs($admin, 'sanctum')->putJson("/api/maintenance-tickets/{$id}", [
+        $update = $this->actingAs($technicien, 'sanctum')->putJson("/api/maintenance-tickets/{$id}", [
             'statut' => 'Résolu',
         ]);
         $update->assertOk()->assertJson(['statut' => 'Résolu']);
@@ -55,21 +55,43 @@ class MaintenanceTicketApiTest extends TestCase
         Event::assertDispatched(MaintenanceTicketUpdated::class, 2);
     }
 
-    public function test_a_technicien_creating_a_ticket_is_automatically_self_assigned(): void
+    public function test_a_technicien_cannot_create_a_maintenance_ticket(): void
     {
         $technicien = User::factory()->asRole('technicien')->create();
-        $someoneElse = User::factory()->asRole('technicien')->create();
         $borne = Borne::factory()->create();
 
         $response = $this->actingAs($technicien, 'sanctum')->postJson('/api/maintenance-tickets', [
             'borne_id' => $borne->id,
             'titre' => 'Panne détectée sur site',
             'priorite' => 'Haute',
-            'technicien_id' => $someoneElse->id, // attempted spoof, must be ignored
         ]);
 
-        $response->assertCreated();
-        $this->assertSame($technicien->id, MaintenanceTicket::findOrFail($response->json('id'))->technicien_id);
+        $response->assertForbidden();
+        $this->assertSame(0, MaintenanceTicket::count());
+    }
+
+    public function test_a_technicien_cannot_delete_a_maintenance_ticket(): void
+    {
+        $technicien = User::factory()->asRole('technicien')->create();
+        $ticket = MaintenanceTicket::factory()->create(['technicien_id' => $technicien->id]);
+
+        $this->actingAs($technicien, 'sanctum')
+            ->deleteJson("/api/maintenance-tickets/{$ticket->id}")
+            ->assertForbidden();
+
+        $this->assertModelExists($ticket);
+    }
+
+    public function test_an_admin_can_delete_a_maintenance_ticket(): void
+    {
+        $admin = User::factory()->create();
+        $ticket = MaintenanceTicket::factory()->create();
+
+        $this->actingAs($admin, 'sanctum')
+            ->deleteJson("/api/maintenance-tickets/{$ticket->id}")
+            ->assertOk();
+
+        $this->assertModelMissing($ticket);
     }
 
     public function test_a_technicien_can_only_update_their_own_assigned_ticket(): void
@@ -102,6 +124,19 @@ class MaintenanceTicketApiTest extends TestCase
         $this->assertSame('Basse', $ticket->fresh()->priorite);
     }
 
+    public function test_a_technicien_can_log_replaced_parts_on_their_own_ticket(): void
+    {
+        $technicien = User::factory()->asRole('technicien')->create();
+        $ticket = MaintenanceTicket::factory()->create(['technicien_id' => $technicien->id]);
+
+        $response = $this->actingAs($technicien, 'sanctum')->putJson("/api/maintenance-tickets/{$ticket->id}", [
+            'pieces_remplacees' => ['Contacteur 32A', 'Câble CCS'],
+        ]);
+
+        $response->assertOk();
+        $this->assertSame(['Contacteur 32A', 'Câble CCS'], $ticket->fresh()->pieces_remplacees);
+    }
+
     public function test_a_critical_ticket_marks_the_borne_as_en_panne_and_raises_an_alert(): void
     {
         Event::fake([BorneUpdated::class, AlerteUpdated::class, MaintenanceTicketUpdated::class]);
@@ -123,20 +158,21 @@ class MaintenanceTicketApiTest extends TestCase
 
     public function test_resolving_the_last_critical_ticket_clears_the_borne_fault(): void
     {
-        $admin = User::factory()->create();
+        $technicien = User::factory()->asRole('technicien')->create();
         $borne = Borne::factory()->create(['status' => 'Disponible']);
 
         $ticket = MaintenanceTicket::factory()->create([
             'borne_id' => $borne->id,
             'priorite' => 'Critique',
             'statut' => 'Ouvert',
+            'technicien_id' => $technicien->id,
         ]);
 
         // Creating it (via the API, so the sync logic actually runs) puts the borne in Défaut.
-        $this->actingAs($admin, 'sanctum')->putJson("/api/maintenance-tickets/{$ticket->id}", ['statut' => 'En cours']);
+        $this->actingAs($technicien, 'sanctum')->putJson("/api/maintenance-tickets/{$ticket->id}", ['statut' => 'En cours']);
         $this->assertSame('Défaut', $borne->fresh()->status);
 
-        $this->actingAs($admin, 'sanctum')
+        $this->actingAs($technicien, 'sanctum')
             ->putJson("/api/maintenance-tickets/{$ticket->id}", ['statut' => 'Résolu'])
             ->assertOk();
 
@@ -146,18 +182,20 @@ class MaintenanceTicketApiTest extends TestCase
     public function test_the_borne_stays_en_panne_while_another_critical_ticket_is_still_open(): void
     {
         $admin = User::factory()->create();
+        $technicien = User::factory()->asRole('technicien')->create();
         $borne = Borne::factory()->create(['status' => 'Disponible']);
 
         $first = $this->actingAs($admin, 'sanctum')->postJson('/api/maintenance-tickets', [
             'borne_id' => $borne->id,
             'titre' => 'Premier défaut',
             'priorite' => 'Critique',
+            'technicien_id' => $technicien->id,
         ])->json('id');
 
         MaintenanceTicket::factory()->create(['borne_id' => $borne->id, 'priorite' => 'Critique', 'statut' => 'Ouvert']);
         $this->assertSame('Défaut', $borne->fresh()->status);
 
-        $this->actingAs($admin, 'sanctum')->putJson("/api/maintenance-tickets/{$first}", ['statut' => 'Résolu']);
+        $this->actingAs($technicien, 'sanctum')->putJson("/api/maintenance-tickets/{$first}", ['statut' => 'Résolu']);
 
         $this->assertSame('Défaut', $borne->fresh()->status);
     }

@@ -52,17 +52,20 @@ Route::middleware('auth:sanctum')->group(function () {
         });
 
         Route::middleware('permission:utilisateurs')->group(function () {
-            Route::apiResource('users', UserController::class)->except(['store']);
+            Route::apiResource('users', UserController::class)->only(['index', 'show']);
             Route::put('/users/{user}/badge', [UserController::class, 'updateBadge']);
             Route::get('/roles', [RoleController::class, 'index']);
         });
 
-        // Creating accounts (for any role) and creating roles themselves are
-        // both reserved to the Super Administrateur — Exploitant/Service Client
-        // keep 'full' read/update/delete access to /users above, but can no
-        // longer create new accounts or roles themselves.
+        // Account CRUD (create/update/delete) and role creation are both
+        // reserved to the Super Administrateur — Exploitant/Service Client
+        // keep read access to /users above (and can still manage RFID badges,
+        // a separate day-to-day operational task) but cannot themselves
+        // create, edit, or delete an account.
         Route::middleware('super_admin')->group(function () {
             Route::post('/users', [UserController::class, 'store']);
+            Route::put('/users/{user}', [UserController::class, 'update']);
+            Route::delete('/users/{user}', [UserController::class, 'destroy']);
             Route::post('/roles', [RoleController::class, 'store']);
         });
 

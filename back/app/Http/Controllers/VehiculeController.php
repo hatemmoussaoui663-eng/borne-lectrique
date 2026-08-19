@@ -7,38 +7,57 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
+/**
+ * Managing client vehicles (Module 10) is an Exploitant/Service Client
+ * day-to-day task, not a Super Administrateur one: even though Admin has
+ * 'full' access to every module by default, it's read-only here — see
+ * ensureNotSuperAdmin(). Same carve-out pattern as maintenance ticket statut.
+ */
 class VehiculeController extends Controller
 {
     public function index(): JsonResponse
     {
-        $vehicules = Vehicule::with('user')->orderBy('id')->get();
+        $vehicules = Vehicule::with('user.badge')->orderBy('id')->get();
 
         return response()->json($vehicules->map->toFrontendArray());
     }
 
     public function store(Request $request): JsonResponse
     {
+        $this->ensureNotSuperAdmin($request);
+
         $data = $this->validated($request);
         $vehicule = Vehicule::create($data);
-        $vehicule->load('user');
+        $vehicule->load('user.badge');
 
         return response()->json($vehicule->toFrontendArray(), 201);
     }
 
     public function update(Request $request, Vehicule $vehicule): JsonResponse
     {
+        $this->ensureNotSuperAdmin($request);
+
         $data = $this->validated($request, $vehicule);
         $vehicule->update($data);
-        $vehicule->load('user');
+        $vehicule->load('user.badge');
 
         return response()->json($vehicule->toFrontendArray());
     }
 
-    public function destroy(Vehicule $vehicule): JsonResponse
+    public function destroy(Request $request, Vehicule $vehicule): JsonResponse
     {
+        $this->ensureNotSuperAdmin($request);
+
         $vehicule->delete();
 
         return response()->json(['message' => 'Véhicule supprimé.']);
+    }
+
+    private function ensureNotSuperAdmin(Request $request): void
+    {
+        if ($request->user()?->role?->name === 'super_admin') {
+            abort(403, 'Le Super Administrateur consulte les véhicules en lecture seule ; la gestion revient à l\'Exploitant.');
+        }
     }
 
     private function validated(Request $request, ?Vehicule $vehicule = null): array

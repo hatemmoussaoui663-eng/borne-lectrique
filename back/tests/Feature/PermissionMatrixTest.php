@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Models\Borne;
+use App\Models\MaintenanceTicket;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -24,6 +25,7 @@ class PermissionMatrixTest extends TestCase
     {
         $technicien = User::factory()->asRole('technicien')->create();
         $borne = Borne::factory()->create();
+        $ticket = MaintenanceTicket::factory()->create(['borne_id' => $borne->id, 'technicien_id' => $technicien->id]);
 
         $this->actingAs($technicien, 'sanctum')->getJson('/api/bornes/'.$borne->id)->assertOk();
         // GET /bornes/{id} is on the shared read-only route, not permission-gated;
@@ -32,13 +34,12 @@ class PermissionMatrixTest extends TestCase
             ->putJson("/api/bornes/{$borne->id}", ['name' => 'Renamed'])
             ->assertForbidden();
 
+        // "Write" access to Maintenance for a Technicien means the statut of
+        // their own assigned ticket — creating/deleting tickets is reserved
+        // to Exploitant/Admin (see MaintenanceTicketApiTest).
         $this->actingAs($technicien, 'sanctum')
-            ->postJson('/api/maintenance-tickets', [
-                'borne_id' => $borne->id,
-                'titre' => 'Panne',
-                'priorite' => 'Haute',
-            ])
-            ->assertCreated();
+            ->putJson("/api/maintenance-tickets/{$ticket->id}", ['statut' => 'En cours'])
+            ->assertOk();
     }
 
     public function test_technicien_cannot_reach_utilisateurs_tarif_or_rapports(): void
@@ -83,7 +84,9 @@ class PermissionMatrixTest extends TestCase
 
     /**
      * Cahier des charges §7 matrix, example rows: Exploitant = "✔" (full)
-     * on both Bornes and Maintenance, same as Admin.
+     * on both Bornes and Maintenance, same as Admin — except resolving a
+     * ticket's statut, which business logic reserves to the assigned
+     * Technicien/Admin (see test_exploitant_can_create_but_not_resolve_a_maintenance_ticket).
      */
     public function test_exploitant_has_full_access_to_bornes_and_maintenance(): void
     {
@@ -101,6 +104,50 @@ class PermissionMatrixTest extends TestCase
                 'priorite' => 'Haute',
             ])
             ->assertCreated();
+    }
+
+    /**
+     * An Exploitant reports/creates and assigns tickets but doesn't do the
+     * repair itself — only the assigned Technicien resolves one.
+     */
+    public function test_exploitant_can_create_but_not_resolve_a_maintenance_ticket(): void
+    {
+        $exploitant = User::factory()->asRole('exploitant')->create();
+        $borne = Borne::factory()->create();
+
+        $create = $this->actingAs($exploitant, 'sanctum')->postJson('/api/maintenance-tickets', [
+            'borne_id' => $borne->id,
+            'titre' => 'Panne',
+            'priorite' => 'Haute',
+            'statut' => 'Résolu',
+        ]);
+        $create->assertCreated();
+        $this->assertSame('Ouvert', $create->json('statut'));
+
+        $ticketId = $create->json('id');
+        $update = $this->actingAs($exploitant, 'sanctum')
+            ->putJson("/api/maintenance-tickets/{$ticketId}", ['statut' => 'Résolu']);
+
+        $update->assertOk();
+        $this->assertSame('Ouvert', $update->json('statut'));
+    }
+
+    /**
+     * Business rule (not from the PDF's simplified §7 example): only the
+     * assigned Technicien resolves a ticket's statut — not even the Super
+     * Administrateur can shortcut it, despite having no restriction elsewhere.
+     */
+    public function test_only_the_assigned_technicien_resolves_a_maintenance_ticket_not_even_admin(): void
+    {
+        $admin = User::factory()->create();
+        $technicien = User::factory()->asRole('technicien')->create();
+        $ticket = MaintenanceTicket::factory()->create(['technicien_id' => $technicien->id, 'statut' => 'Ouvert']);
+
+        $update = $this->actingAs($admin, 'sanctum')
+            ->putJson("/api/maintenance-tickets/{$ticket->id}", ['statut' => 'Résolu']);
+
+        $update->assertOk();
+        $this->assertSame('Ouvert', $ticket->fresh()->statut);
     }
 
     public function test_operateur_can_read_but_not_write_tarif(): void

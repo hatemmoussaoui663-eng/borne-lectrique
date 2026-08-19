@@ -40,6 +40,31 @@ export async function createUser(input: CreateUserInput): Promise<AppUser> {
   return toAppUser(data)
 }
 
+export interface UpdateUserInput {
+  name: string
+  email: string
+  phone?: string
+  roleId: number
+  isActive: boolean
+  password?: string
+}
+
+export async function updateUser(id: string, input: UpdateUserInput): Promise<AppUser> {
+  const { data } = await apiClient.put<AuthUser>(`/users/${id}`, {
+    name: input.name,
+    email: input.email,
+    phone: input.phone || null,
+    role_id: input.roleId,
+    is_active: input.isActive,
+    password: input.password || undefined,
+  })
+  return toAppUser(data)
+}
+
+export async function deleteUser(id: string): Promise<void> {
+  await apiClient.delete(`/users/${id}`)
+}
+
 export interface BadgeInput {
   code: string
   status?: BadgeStatut

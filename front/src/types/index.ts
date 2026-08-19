@@ -75,6 +75,8 @@ export interface Badge {
   code: string
   status: BadgeStatut
   expiresAt: string | null
+  /** Has this badge authorized at least one charge session? Once true, its code is locked (back office read-only). */
+  used: boolean
 }
 
 export interface AppUser {
@@ -104,6 +106,8 @@ export interface AuthUser {
 export interface Vehicule {
   id: string
   proprietaire: string
+  /** RFID badge code of the vehicule's owner, if any. */
+  badge: string | null
   marque: string
   modele: string
   immatriculation: string

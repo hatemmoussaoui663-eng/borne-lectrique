@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Tabs, Button, Spin, message, Modal, Input, Popconfirm, Dropdown } from 'antd'
 import {
   ArrowLeftOutlined,
@@ -115,9 +115,12 @@ function ConnectorActions({ borneId, connecteur }: { borneId: string; connecteur
 
 function BorneDetail() {
   const { id } = useParams()
-  const { can } = useAuth()
+  const navigate = useNavigate()
+  const { can, user } = useAuth()
   const canCommand = can('commandes_ocpp', 'full')
-  const canMaintenance = can('maintenance', 'full')
+  // Reporting/opening a ticket is an Exploitant/Admin action — a Technicien
+  // is read-only on tickets except for the statut/pieces of their own.
+  const canCreateTicket = can('maintenance', 'full') && user?.role_slug !== 'technicien'
   const [borne, setBorne] = useState<Borne | null>(null)
   const [loading, setLoading] = useState(true)
   const [resetting, setResetting] = useState(false)
@@ -200,7 +203,14 @@ function BorneDetail() {
               </Button>
             </Dropdown>
           )}
-          {canMaintenance && <Button icon={<ToolOutlined />}>Créer un ticket</Button>}
+          {canCreateTicket && (
+            <Button
+              icon={<ToolOutlined />}
+              onClick={() => navigate('/dashboard/maintenance', { state: { borneId: borne.id } })}
+            >
+              Créer un ticket
+            </Button>
+          )}
         </div>
       </div>
 
