@@ -4,10 +4,9 @@ namespace App\Http\Controllers;
 
 use App\Models\Borne;
 use App\Models\ChargeSession;
-use Illuminate\Http\Client\ConnectionException;
+use App\Support\OcppClient;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Http;
 
 /**
  * CSMS-initiated OCPP commands (Module 6, "communication avec les bornes"):
@@ -75,31 +74,12 @@ class OcppCommandController extends Controller
 
     private function send(Borne $borne, string $action, array $payload): JsonResponse
     {
-        if ($borne->charge_point_id === null) {
-            return response()->json(['message' => "Cette borne n'est pas reliée au serveur OCPP."], 422);
+        $resultat = app(OcppClient::class)->envoyer($borne, $action, $payload);
+
+        if (! $resultat['succes']) {
+            return response()->json(['message' => $resultat['message']], $resultat['status']);
         }
 
-        $baseUrl = rtrim((string) env('OCPP_CENTRAL_URL', 'http://127.0.0.1:8010'), '/');
-        $token = (string) env('OCPP_INGEST_TOKEN', '');
-
-        try {
-            $response = Http::timeout(25)
-                ->withHeaders(['X-Internal-Token' => $token])
-                ->post("{$baseUrl}/commands/{$borne->charge_point_id}", [
-                    'action' => $action,
-                    'payload' => $payload,
-                ]);
-        } catch (ConnectionException) {
-            return response()->json(['message' => 'Serveur OCPP central injoignable.'], 502);
-        }
-
-        if (! $response->successful()) {
-            return response()->json(
-                ['message' => $response->json('message') ?? 'La commande a échoué.'],
-                $response->status()
-            );
-        }
-
-        return response()->json($response->json());
+        return response()->json($resultat['donnees']);
     }
 }

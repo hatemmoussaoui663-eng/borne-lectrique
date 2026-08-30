@@ -41,6 +41,12 @@ class Borne extends Model
         return $this->hasMany(ChargeSession::class);
     }
 
+    /** Notices, photos, contrats, plans et garanties de la borne (Module 16). */
+    public function documents(): HasMany
+    {
+        return $this->hasMany(Document::class);
+    }
+
     /**
      * Map to the shape the React app expects: `id`, `nom`, `reference`, `numeroSerie`,
      * `modele`, `fabricant`, `adresse`, `ville`, `lat`, `lng`, `firmware`, `ocpp`,

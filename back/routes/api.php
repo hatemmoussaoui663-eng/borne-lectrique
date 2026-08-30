@@ -1,10 +1,13 @@
 <?php
 
 use App\Http\Controllers\AlerteController;
+use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthController;
 use App\Http\Controllers\BorneController;
 use App\Http\Controllers\ChargeSessionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\FirmwareController;
 use App\Http\Controllers\MaintenanceTicketController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\OcppCommandController;
@@ -95,6 +98,36 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::apiResource('maintenance-tickets', MaintenanceTicketController::class)->except(['show']);
         });
 
+        // Journal d'audit (Module 18) : consultation et export uniquement.
+        // Aucune route d'écriture — le journal est alimenté par l'observateur
+        // Eloquent et par AuthController, jamais depuis l'API.
+        Route::middleware('permission:audit')->group(function () {
+            Route::get('/audit-logs', [AuditLogController::class, 'index']);
+            Route::get('/audit-logs/export', [AuditLogController::class, 'export']);
+        });
+
+        // Gestion Firmware (Module 13) : bibliothèque, déploiement, historique
+        // et rollback. Le téléchargement du binaire par la borne passe par une
+        // route signée hors session, déclarée plus bas.
+        Route::middleware('permission:firmware')->group(function () {
+            Route::get('/firmwares', [FirmwareController::class, 'index']);
+            Route::post('/firmwares', [FirmwareController::class, 'store']);
+            Route::delete('/firmwares/{firmware}', [FirmwareController::class, 'destroy']);
+            Route::post('/firmwares/{firmware}/deployer', [FirmwareController::class, 'deployer']);
+            Route::get('/firmware-deployments', [FirmwareController::class, 'deployments']);
+            Route::post('/firmware-deployments/{deployment}/rollback', [FirmwareController::class, 'rollback']);
+        });
+
+        // Gestion documentaire (Module 16) : notices, photos, contrats, plans
+        // et garanties. Le téléchargement est un GET, donc ouvert aux rôles en
+        // lecture seule ; l’ajout et la suppression exigent 'full'.
+        Route::middleware('permission:documents')->group(function () {
+            Route::get('/documents', [DocumentController::class, 'index']);
+            Route::post('/documents', [DocumentController::class, 'store']);
+            Route::get('/documents/{document}/download', [DocumentController::class, 'download']);
+            Route::delete('/documents/{document}', [DocumentController::class, 'destroy']);
+        });
+
         Route::middleware('permission:rapports')->group(function () {
             Route::get('/rapports/export', [RapportController::class, 'exportSessions']);
         });
@@ -125,5 +158,12 @@ Route::middleware('ocpp.internal')->prefix('internal/ocpp')->group(function () {
     Route::post('/start-transaction', [OcppIngestController::class, 'startTransaction']);
     Route::post('/meter-values', [OcppIngestController::class, 'meterValues']);
     Route::post('/stop-transaction', [OcppIngestController::class, 'stopTransaction']);
+    Route::post('/firmware-status-notification', [OcppIngestController::class, 'firmwareStatusNotification']);
     Route::post('/disconnect', [OcppIngestController::class, 'disconnect']);
 });
+
+// Téléchargement du binaire par la borne (Module 13). Hors Sanctum : une borne
+// n'a pas de session. L'URL est signée et expire — voir FirmwareController.
+Route::get('/firmwares/{firmware}/telecharger', [FirmwareController::class, 'telecharger'])
+    ->middleware('signed')
+    ->name('firmware.telecharger');

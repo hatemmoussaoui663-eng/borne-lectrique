@@ -118,6 +118,24 @@ async function meterValues(payload, { log }) {
   return {}
 }
 
+/**
+ * The charge point reporting how its firmware update is going (OCPP 1.6 4.4).
+ * This is the only progress signal there is: the CALLRESULT to UpdateFirmware
+ * only acknowledges the order, never its outcome.
+ */
+async function firmwareStatusNotification(payload, { chargePointId, log }) {
+  try {
+    await postToLaravel('/firmware-status-notification', {
+      chargePointId,
+      status: payload.status,
+    })
+  } catch (error) {
+    log(`firmware-status-notification ingest failed: ${error.message}`)
+  }
+
+  return {}
+}
+
 const handlers = {
   BootNotification: bootNotification,
   Heartbeat: heartbeat,
@@ -126,11 +144,12 @@ const handlers = {
   StartTransaction: startTransaction,
   StopTransaction: stopTransaction,
   MeterValues: meterValues,
+  FirmwareStatusNotification: firmwareStatusNotification,
 }
 
 /**
  * Routes an OCPP-J CALL to its handler. Actions this CSMS doesn't implement
- * (DiagnosticsStatusNotification, FirmwareStatusNotification, DataTransfer, ...)
+ * (DiagnosticsStatusNotification, DataTransfer, ...)
  * get a generic empty-accepted reply so the simulator never sees a CALLERROR
  * for something out of scope.
  */

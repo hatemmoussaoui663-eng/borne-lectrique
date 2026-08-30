@@ -140,3 +140,97 @@ export interface Alerte {
   date: string
   lue: boolean
 }
+
+/** Les cinq natures de pièces listées au Module 16 (gestion documentaire). */
+export type DocumentType = 'notice' | 'photo' | 'contrat' | 'plan' | 'garantie'
+
+export interface DocumentFichier {
+  id: string
+  /** `null` = document général du réseau, rattaché à aucune borne en particulier. */
+  borneId: string | null
+  borne: string | null
+  type: DocumentType
+  titre: string
+  nomFichier: string
+  mime: string
+  /** Taille en octets. */
+  taille: number
+  /** Échéance : portée uniquement par les contrats et les garanties. */
+  dateExpiration: string | null
+  expire: boolean
+  ajoutePar: string | null
+  ajouteLe: string
+}
+
+/** Actions tracées par le journal d'audit (Module 18). */
+export type AuditAction =
+  | 'connexion'
+  | 'connexion_echouee'
+  | 'deconnexion'
+  | 'creation'
+  | 'modification'
+  | 'suppression'
+
+/** Diff d'une modification : { champ: { avant, apres } }. */
+export type AuditChangements = Record<string, { avant: string | null; apres: string | null } | string | null>
+
+export interface AuditLogEntry {
+  id: string
+  /** Nom recopié à l'écriture : reste lisible même si le compte a été supprimé. */
+  utilisateur: string
+  role: string | null
+  /** La ligne pointe-t-elle encore vers un compte existant ? */
+  compteLie: boolean
+  action: AuditAction
+  entite: string | null
+  entiteId: string | null
+  libelle: string
+  changements: AuditChangements | null
+  ip: string | null
+  date: string
+}
+
+/** Un binaire de la bibliothèque de firmwares (Module 13). */
+export interface Firmware {
+  id: string
+  version: string
+  /** Nuls = firmware générique, applicable à toutes les bornes. */
+  fabricant: string | null
+  modele: string | null
+  notes: string | null
+  nomFichier: string
+  taille: number
+  /** SHA-256 du binaire téléversé. */
+  checksum: string
+  ajoutePar: string | null
+  ajouteLe: string
+  deploiements: number | null
+}
+
+export type FirmwareStatut =
+  | 'en_attente'
+  | 'telechargement'
+  | 'telecharge'
+  | 'installation'
+  | 'installe'
+  | 'echec'
+
+export interface FirmwareDeployment {
+  id: string
+  firmwareId: string | null
+  version: string
+  /** Version portée par la borne avant l'ordre : la cible d'un rollback. */
+  versionPrecedente: string | null
+  borneId: string
+  borne: string | null
+  statut: FirmwareStatut
+  /** Statut OCPP brut renvoyé par la borne (Downloading, Installed…). */
+  ocppStatus: string | null
+  message: string | null
+  estRollback: boolean
+  enCours: boolean
+  rollbackPossible: boolean
+  demandePar: string | null
+  date: string
+  majLe: string
+}

@@ -9,6 +9,7 @@ use App\Models\Alerte;
 use App\Models\Badge;
 use App\Models\Borne;
 use App\Models\ChargeSession;
+use App\Models\FirmwareDeployment;
 use App\Models\Tarif;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -196,6 +197,73 @@ class OcppIngestController extends Controller
         }
 
         return response()->json(['ok' => true]);
+    }
+
+    /**
+     * FirmwareStatusNotification (OCPP 1.6 §4.4), suivi du Module 13 : la borne
+     * rend compte de sa mise à jour. C'est le seul retour dont on dispose — la
+     * réponse à `UpdateFirmware` n'accuse que la réception de l'ordre, pas son
+     * issue, qui n'arrive que par ces notifications successives.
+     */
+    public function firmwareStatusNotification(Request $request): JsonResponse
+    {
+        $data = $request->validate([
+            'chargePointId' => 'required|string|max:255',
+            'status' => 'required|string|max:50',
+        ]);
+
+        $borne = $this->resolveBorne($data['chargePointId']);
+
+        $deployment = FirmwareDeployment::where('borne_id', $borne->id)
+            ->whereIn('statut', FirmwareDeployment::STATUTS_EN_COURS)
+            ->latest('id')
+            ->first();
+
+        // Une borne émet aussi des statuts sans qu'on ait rien demandé (`Idle`
+        // au démarrage). Sans déploiement en cours, il n'y a rien à rattacher.
+        if ($deployment === null) {
+            return response()->json(['ok' => true, 'suivi' => false]);
+        }
+
+        $deployment->ocpp_status = $data['status'];
+        $statut = FirmwareDeployment::MAPPING_OCPP[$data['status']] ?? null;
+
+        if ($statut === null) {
+            // Statut inconnu ou `Idle` : on garde le brut sans écraser un état
+            // d'avancement déjà acquis.
+            $deployment->save();
+
+            return response()->json(['ok' => true, 'suivi' => false]);
+        }
+
+        $deployment->statut = $statut;
+
+        if ($statut === FirmwareDeployment::STATUT_ECHEC) {
+            $deployment->message = "La borne a signalé « {$data['status']} ».";
+        }
+
+        $deployment->save();
+
+        if ($statut === FirmwareDeployment::STATUT_INSTALLE) {
+            // La version portée par la borne ne change qu'ici : tant que
+            // l'installation n'est pas confirmée, la fiche doit continuer
+            // d'afficher l'ancienne.
+            $borne->firmware = $deployment->firmware_version;
+            $borne->save();
+            BorneUpdated::dispatch($borne);
+        }
+
+        if ($statut === FirmwareDeployment::STATUT_ECHEC) {
+            $this->maybeRaiseAlert(
+                $borne,
+                0,
+                'firmware',
+                'warning',
+                "Échec de la mise à jour firmware {$deployment->firmware_version} sur {$borne->name}"
+            );
+        }
+
+        return response()->json(['ok' => true, 'suivi' => true]);
     }
 
     /**

@@ -16,6 +16,9 @@ import Vehicules from "./pages/admin/Vehicules";
 import Maintenance from "./pages/admin/Maintenance";
 import Alertes from "./pages/admin/Alertes";
 import Rapports from "./pages/admin/Rapports";
+import Documents from "./pages/admin/Documents";
+import Audit from "./pages/admin/Audit";
+import Firmware from "./pages/admin/Firmware";
 import Parametres from "./pages/admin/Parametres";
 import Simulator from "./pages/admin/Simulator";
 import ClientBornes from "./pages/client/Bornes";
@@ -61,6 +64,9 @@ function App() {
         <Route path="maintenance" element={<Maintenance />} />
         <Route path="alertes" element={<Alertes />} />
         <Route path="rapports" element={<Rapports />} />
+        <Route path="documents" element={<Documents />} />
+        <Route path="firmware" element={<Firmware />} />
+        <Route path="audit" element={<Audit />} />
         <Route path="parametres" element={<Parametres />} />
         <Route path="simulator" element={<Simulator />} />
       </Route>

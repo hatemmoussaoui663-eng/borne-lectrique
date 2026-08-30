@@ -7,6 +7,7 @@ use App\Http\Requests\Auth\ForgotPasswordRequest;
 use App\Http\Requests\Auth\LoginRequest;
 use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Resources\UserResource;
+use App\Models\AuditLog;
 use App\Models\User;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -22,12 +23,28 @@ class AuthController extends Controller
         $user = User::where('email', $request->email)->first();
 
         if (! $user || ! Hash::check($request->password, $user->password)) {
+            // Les tentatives ratées sont le premier signal d'une attaque par
+            // force brute : elles valent au moins autant que les réussites dans
+            // un journal d'audit (Module 18). L'email tenté sert d'auteur,
+            // puisqu'aucune session n'existe encore.
+            AuditLog::enregistrer(
+                AuditLog::ACTION_CONNEXION_ECHOUEE,
+                'Échec de connexion : identifiants incorrects',
+                auteur: $request->email,
+            );
+
             throw ValidationException::withMessages([
                 'message' => ['Identifiants incorrects.'],
             ]);
         }
 
         if (! $user->is_active) {
+            AuditLog::enregistrer(
+                AuditLog::ACTION_CONNEXION_ECHOUEE,
+                'Échec de connexion : compte désactivé',
+                utilisateur: $user,
+            );
+
             throw ValidationException::withMessages([
                 'message' => ['Votre compte est désactivé.'],
             ]);
@@ -35,6 +52,15 @@ class AuthController extends Controller
 
         $token = $user->createToken('auth-token')->plainTextToken;
         $user->load(['role', 'badge']);
+
+        // `Auth::user()` n'est pas encore renseigné à ce stade de la requête :
+        // on passe le compte explicitement, sans quoi la ligne perdrait son
+        // rattachement et se lirait comme l'action d'un compte supprimé.
+        AuditLog::enregistrer(
+            AuditLog::ACTION_CONNEXION,
+            'Connexion réussie',
+            utilisateur: $user,
+        );
 
         return response()->json([
             'token' => $token,
@@ -45,6 +71,11 @@ class AuthController extends Controller
 
     public function logout(Request $request): JsonResponse
     {
+        // Tracé avant la révocation du jeton : après, `Auth::user()` serait
+        // encore renseigné pour cette requête, mais l'ordre reste plus sûr si
+        // la suppression venait à échouer.
+        AuditLog::enregistrer(AuditLog::ACTION_DECONNEXION, 'Déconnexion');
+
         $request->user()->currentAccessToken()->delete();
 
         return response()->json([

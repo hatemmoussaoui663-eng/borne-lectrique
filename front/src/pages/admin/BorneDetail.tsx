@@ -11,6 +11,7 @@ import {
   ReloadOutlined,
 } from '@ant-design/icons'
 import StatusTag from '../../components/admin/StatusTag'
+import Documents from './Documents'
 import { apiClient } from '../../api/client'
 import { remoteStart, remoteStop, unlockConnector, resetBorne } from '../../api/commands'
 import { useAuth } from '../../context/AuthContext'
@@ -121,6 +122,7 @@ function BorneDetail() {
   // Reporting/opening a ticket is an Exploitant/Admin action — a Technicien
   // is read-only on tickets except for the statut/pieces of their own.
   const canCreateTicket = can('maintenance', 'full') && user?.role_slug !== 'technicien'
+  const canVoirDocuments = can('documents')
   const [borne, setBorne] = useState<Borne | null>(null)
   const [loading, setLoading] = useState(true)
   const [resetting, setResetting] = useState(false)
@@ -288,6 +290,15 @@ function BorneDetail() {
               </div>
             ),
           },
+          ...(canVoirDocuments
+            ? [
+                {
+                  key: 'documents',
+                  label: 'Documents',
+                  children: <Documents borneId={borne.id} compact />,
+                },
+              ]
+            : []),
         ]}
       />
     </div>
