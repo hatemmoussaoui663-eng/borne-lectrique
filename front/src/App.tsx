@@ -19,12 +19,14 @@ import Rapports from "./pages/admin/Rapports";
 import Documents from "./pages/admin/Documents";
 import Audit from "./pages/admin/Audit";
 import Firmware from "./pages/admin/Firmware";
+import Paiement from "./pages/admin/Paiement";
 import Parametres from "./pages/admin/Parametres";
 import Simulator from "./pages/admin/Simulator";
 import ClientBornes from "./pages/client/Bornes";
 import ClientVehicules from "./pages/client/Vehicules";
 import ClientHistorique from "./pages/client/Historique";
 import ClientBadge from "./pages/client/Badge";
+import ClientFactures from "./pages/client/Factures";
 
 // Every role except "Client" belongs on the operator/admin back-office side.
 const STAFF_ROLES = [
@@ -65,6 +67,7 @@ function App() {
         <Route path="alertes" element={<Alertes />} />
         <Route path="rapports" element={<Rapports />} />
         <Route path="documents" element={<Documents />} />
+        <Route path="paiement" element={<Paiement />} />
         <Route path="firmware" element={<Firmware />} />
         <Route path="audit" element={<Audit />} />
         <Route path="parametres" element={<Parametres />} />
@@ -83,6 +86,7 @@ function App() {
         <Route path="vehicules" element={<ClientVehicules />} />
         <Route path="historique" element={<ClientHistorique />} />
         <Route path="badge" element={<ClientBadge />} />
+        <Route path="factures" element={<ClientFactures />} />
       </Route>
     </Routes>
   );

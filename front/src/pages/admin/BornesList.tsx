@@ -352,7 +352,19 @@ function BornesList() {
           >
             <div style={{ height: 400 }}>
               <MapContainer center={[36.8, 10.18]} zoom={10} style={{ height: '100%', width: '100%' }}>
-                <TileLayer url="https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png" />
+                {/* Esri plutôt que CARTO, qui exige une clé d'API et marque
+                    ses tuiles « API KEY REQUIRED » sans elle. */}
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                  attribution="Tiles &copy; Esri"
+                  maxZoom={19}
+                  maxNativeZoom={16}
+                />
+                <TileLayer
+                  url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Light_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+                  maxZoom={19}
+                  maxNativeZoom={16}
+                />
                 <MapClickMarker setPosition={setMapPos} />
                 {mapPos && <Marker position={mapPos} />}
               </MapContainer>

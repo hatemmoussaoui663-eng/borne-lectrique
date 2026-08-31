@@ -8,10 +8,12 @@ class Tarif extends Model
 {
     protected $fillable = [
         'prix_kwh',
+        'tva_taux',
     ];
 
     protected $casts = [
         'prix_kwh' => 'float',
+        'tva_taux' => 'float',
     ];
 
     /**
@@ -21,13 +23,14 @@ class Tarif extends Model
      */
     public static function current(): self
     {
-        return self::firstOrCreate(['id' => 1], ['prix_kwh' => 0.35]);
+        return self::firstOrCreate(['id' => 1], ['prix_kwh' => 0.35, 'tva_taux' => 19.00]);
     }
 
     public function toFrontendArray(): array
     {
         return [
             'prixKwh' => (float) $this->prix_kwh,
+            'tvaTaux' => (float) $this->tva_taux,
         ];
     }
 }

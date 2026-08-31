@@ -2,10 +2,15 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Abonnement;
 use App\Models\ChargeSession;
+use App\Models\Facture;
 use App\Models\Vehicule;
+use App\Models\Wallet;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Validation\Rule;
 
 /**
@@ -31,6 +36,52 @@ class MeController extends Controller
         $vehicules = Vehicule::where('user_id', $request->user()->id)->orderBy('id')->get();
 
         return response()->json($vehicules->map->toFrontendArray());
+    }
+
+    /**
+     * Mes factures (Module 9). Le §7 du cahier des charges donne au Client un
+     * accès « Lecture » sur Paiement : il consulte et télécharge, il ne règle
+     * ni ne rembourse — ces actions restent au back-office.
+     */
+    public function factures(Request $request): JsonResponse
+    {
+        $factures = Facture::with(['chargeSession.borne', 'paiements'])
+            ->where('user_id', $request->user()->id)
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json($factures->map->toFrontendArray());
+    }
+
+    public function facturePdf(Request $request, Facture $facture): Response
+    {
+        // Le contrôle décisif du module : sans lui, un client authentifié
+        // pourrait télécharger la facture d'un autre en changeant l'id.
+        abort_unless($facture->user_id === $request->user()->id, 403);
+
+        $facture->load(['chargeSession.borne', 'paiements', 'user']);
+
+        return Pdf::loadView('factures.pdf', ['facture' => $facture])
+            ->download("{$facture->numero}.pdf");
+    }
+
+    /** Mon porte-monnaie et ses mouvements (Module 9). */
+    public function wallet(Request $request): JsonResponse
+    {
+        $wallet = Wallet::pour($request->user())->load(['user', 'transactions']);
+
+        return response()->json($wallet->toFrontendArray());
+    }
+
+    /** Mon abonnement en cours, et l'historique de mes souscriptions. */
+    public function abonnements(Request $request): JsonResponse
+    {
+        $abonnements = Abonnement::with('user')
+            ->where('user_id', $request->user()->id)
+            ->orderByDesc('id')
+            ->get();
+
+        return response()->json($abonnements->map->toFrontendArray());
     }
 
     public function storeVehicule(Request $request): JsonResponse

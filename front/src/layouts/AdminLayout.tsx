@@ -15,6 +15,7 @@ import {
   FolderOpenOutlined,
   SafetyOutlined,
   CloudDownloadOutlined,
+  CreditCardOutlined,
   SettingOutlined,
   SearchOutlined,
   MenuFoldOutlined,
@@ -63,6 +64,12 @@ const allItems: (NonNullable<MenuProps["items"]>[number] & { module?: string })[
     module: "documents",
   },
   {
+    key: "/dashboard/paiement",
+    icon: <CreditCardOutlined />,
+    label: "Paiement",
+    module: "paiement",
+  },
+  {
     key: "/dashboard/firmware",
     icon: <CloudDownloadOutlined />,
     label: "Firmware",
@@ -97,6 +104,7 @@ const titles: Record<string, string> = {
   "/dashboard/alertes": "Alertes",
   "/dashboard/rapports": "Rapports",
   "/dashboard/documents": "Gestion documentaire",
+  "/dashboard/paiement": "Paiement et facturation",
   "/dashboard/firmware": "Gestion firmware",
   "/dashboard/audit": "Journal d'audit",
   "/dashboard/parametres": "Paramètres",

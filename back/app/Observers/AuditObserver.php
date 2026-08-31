@@ -3,11 +3,15 @@
 namespace App\Observers;
 
 use App\Models\AuditLog;
+use App\Models\Abonnement;
+use App\Models\AbonnementPlan;
 use App\Models\Badge;
 use App\Models\Borne;
 use App\Models\Document;
+use App\Models\Facture;
 use App\Models\Firmware;
 use App\Models\MaintenanceTicket;
+use App\Models\Paiement;
 use App\Models\Role;
 use App\Models\Tarif;
 use App\Models\User;
@@ -66,6 +70,14 @@ class AuditObserver
         // eux-mêmes ne sont pas audités ici — le Module 13 tient déjà son propre
         // historique, plus riche (statut OCPP, version précédente, rollback).
         Firmware::class => ['libelle' => 'Firmware', 'titre' => 'version'],
+        // Module 9 : tout ce qui touche à l’argent est audité. Les factures
+        // émises automatiquement en fin de session ne le sont pas, faute de
+        // session authentifiée côté ingest OCPP — seuls les émissions,
+        // règlements et remboursements décidés par un humain laissent une trace.
+        Facture::class => ['libelle' => 'Facture', 'titre' => 'numero'],
+        Paiement::class => ['libelle' => 'Paiement', 'titre' => 'reference'],
+        Abonnement::class => ['libelle' => 'Abonnement', 'titre' => 'plan_nom'],
+        AbonnementPlan::class => ['libelle' => "Formule d'abonnement", 'titre' => 'nom'],
     ];
 
     /** Les modèles à observer, pour l'enregistrement dans AppServiceProvider. */

@@ -85,11 +85,29 @@ function BornesMap({
           style={{ height: "100%", width: "100%", background: "#0f2417" }}
         >
           {mode === "street" ? (
-            <TileLayer
-              url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
-              attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/attributions">CARTO</a>'
-              maxZoom={20}
-            />
+            // Fond sombre servi par Esri, comme la vue satellite ci-dessous.
+            // CARTO exige désormais une clé d'API et estampille « API KEY
+            // REQUIRED » en travers de ses tuiles ; Esri n'en demande pas.
+            // Ses tuiles s'arrêtant au zoom 16, `maxNativeZoom` laisse Leaflet
+            // agrandir les dernières plutôt que d'afficher du vide au-delà.
+            <>
+              <TileLayer
+                // Noirci par CSS (voir .bornes-map__basemap) : Leaflet pose
+                // cette classe sur le conteneur de tuiles de cette couche-ci,
+                // ce qui laisse les libellés de la couche suivante intacts.
+                className="bornes-map__basemap"
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
+                attribution="Tiles &copy; Esri — Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
+                maxZoom={19}
+                maxNativeZoom={16}
+              />
+              {/* Couche séparée chez Esri : sans elle, la carte n'a aucun nom de ville. */}
+              <TileLayer
+                url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
+                maxZoom={19}
+                maxNativeZoom={16}
+              />
+            </>
           ) : (
             <>
               <TileLayer

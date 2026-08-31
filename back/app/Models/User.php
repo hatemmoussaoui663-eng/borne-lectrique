@@ -51,6 +51,37 @@ class User extends Authenticatable
         return $this->hasMany(Vehicule::class);
     }
 
+    public function wallet()
+    {
+        return $this->hasOne(Wallet::class);
+    }
+
+    public function factures()
+    {
+        return $this->hasMany(Facture::class);
+    }
+
+    public function abonnements()
+    {
+        return $this->hasMany(Abonnement::class);
+    }
+
+    /**
+     * L'abonnement qui donne droit a une remise aujourd'hui, s'il y en a un.
+     * Un client peut en avoir plusieurs dans l'historique (resilies, expires) ;
+     * un seul au plus est en cours.
+     */
+    public function abonnementEnCours(): ?Abonnement
+    {
+        return $this->abonnements()
+            ->where('statut', Abonnement::STATUT_ACTIF)
+            ->where(function ($q) {
+                $q->whereNull('fin')->orWhere('fin', '>=', now()->toDateString());
+            })
+            ->latest('id')
+            ->first();
+    }
+
     /**
      * This user's access level ('full' | 'read' | 'none') for a given module,
      * per the intra-staff permission matrix (config/permissions.php, cahier

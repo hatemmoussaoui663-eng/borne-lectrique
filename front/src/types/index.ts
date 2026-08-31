@@ -234,3 +234,90 @@ export interface FirmwareDeployment {
   date: string
   majLe: string
 }
+
+/* ---------------------------------------------- Module 9 : Paiement ------- */
+
+export type FactureStatut = 'impayee' | 'payee' | 'remboursee' | 'annulee'
+export type MoyenPaiement = 'carte' | 'wallet' | 'abonnement' | 'differe'
+export type PaiementStatut = 'en_attente' | 'paye' | 'echoue' | 'rembourse'
+
+export interface Paiement {
+  id: string
+  factureId: string
+  montant: number
+  moyen: MoyenPaiement
+  statut: PaiementStatut
+  reference: string | null
+  payeLe: string | null
+  rembourseLe: string | null
+  motifRemboursement: string | null
+  enregistrePar: string | null
+  remboursable: boolean
+  /** Renseignés par la liste des paiements, absents ailleurs. */
+  numeroFacture?: string | null
+  client?: string | null
+}
+
+export interface Facture {
+  id: string
+  numero: string
+  userId: string | null
+  client: string
+  sessionId: string | null
+  borne: string | null
+  energieKwh: number | null
+  montantHt: number
+  remisePourcent: number
+  montantRemise: number
+  tvaTaux: number
+  montantTva: number
+  montantTtc: number
+  statut: FactureStatut
+  /** Date limite d'un paiement différé. */
+  echeance: string | null
+  enRetard: boolean
+  emiseLe: string | null
+  paiements: Paiement[] | null
+}
+
+export interface WalletTransaction {
+  id: string
+  type: 'credit' | 'debit'
+  montant: number
+  soldeApres: number
+  motif: string
+  factureId: string | null
+  date: string
+}
+
+export interface Wallet {
+  id: string
+  userId: string
+  client: string | null
+  solde: number
+  transactions: WalletTransaction[] | null
+}
+
+export interface AbonnementPlan {
+  id: string
+  nom: string
+  description: string | null
+  prixMensuel: number
+  remisePourcent: number
+  actif: boolean
+  abonnes: number | null
+}
+
+export interface Abonnement {
+  id: string
+  userId: string
+  client: string | null
+  planId: string | null
+  plan: string
+  prixMensuel: number
+  remisePourcent: number
+  statut: 'actif' | 'resilie' | 'expire'
+  enCours: boolean
+  debut: string | null
+  fin: string | null
+}

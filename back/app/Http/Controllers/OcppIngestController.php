@@ -11,8 +11,11 @@ use App\Models\Borne;
 use App\Models\ChargeSession;
 use App\Models\FirmwareDeployment;
 use App\Models\Tarif;
+use App\Support\FacturationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Log;
+use Throwable;
 
 /**
  * Machine-to-machine endpoints called by the `ocpp-central-system` Node process
@@ -171,6 +174,17 @@ class OcppIngestController extends Controller
         $session->save();
 
         ChargeSessionUpdated::dispatch($session);
+
+        // Facturation (Module 9) : une session close et rattachée à un client
+        // donne lieu à une facture. Isolée dans un try/catch parce qu'un
+        // incident de facturation ne doit pas faire échouer l'acquittement OCPP
+        // — la borne resterait alors bloquée sur une transaction ouverte. Les
+        // sessions manquées se rattrapent via POST /api/factures/generer.
+        try {
+            app(FacturationService::class)->emettrePourSession($session);
+        } catch (Throwable $e) {
+            Log::error("Facturation de la session {$session->id} impossible : {$e->getMessage()}");
+        }
 
         $borne = $session->borne;
         if ($borne !== null) {

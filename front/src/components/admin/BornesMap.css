@@ -10,11 +10,17 @@
   font-family: var(--font-body);
 }
 
-/* Dark basemap, brightened just enough to read roads/labels clearly
-   without breaking from the app's dark theme. Satellite imagery is left
-   untouched so it isn't washed out by the same filter. */
-.bornes-map--street .leaflet-tile-pane {
-  filter: brightness(4.55) contrast(0.92) saturate(1.15);
+/* Fond de carte noirci. Les tuiles Esri sont d'un gris moyen (~#3c3c3c) là où
+   l'ancien fond CARTO était quasi noir : le facteur est donc inférieur à 1,
+   là où l'ancien filtre éclaircissait (brightness 4.55). Cette valeur est le
+   seul réglage à toucher pour ajuster la noirceur.
+
+   Le filtre porte sur le fond seul, pas sur `.leaflet-tile-pane` : la couche
+   des libellés vit dans le même panneau et serait assombrie avec lui, alors
+   que les noms de villes doivent au contraire ressortir sur le noir.
+   L'imagerie satellite n'est pas concernée non plus. */
+.bornes-map__basemap {
+  filter: brightness(0.42) saturate(0);
 }
 
 .bornes-map__modes {

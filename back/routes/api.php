@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\AbonnementController;
 use App\Http\Controllers\AlerteController;
 use App\Http\Controllers\AuditLogController;
 use App\Http\Controllers\Auth\AuthController;
@@ -7,16 +8,19 @@ use App\Http\Controllers\BorneController;
 use App\Http\Controllers\ChargeSessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\DocumentController;
+use App\Http\Controllers\FactureController;
 use App\Http\Controllers\FirmwareController;
 use App\Http\Controllers\MaintenanceTicketController;
 use App\Http\Controllers\MeController;
 use App\Http\Controllers\OcppCommandController;
 use App\Http\Controllers\OcppIngestController;
+use App\Http\Controllers\PaiementController;
 use App\Http\Controllers\RapportController;
 use App\Http\Controllers\RoleController;
 use App\Http\Controllers\SimulatorController;
 use App\Http\Controllers\TarifController;
 use App\Http\Controllers\UserController;
+use App\Http\Controllers\WalletController;
 use App\Http\Controllers\VehiculeController;
 use Illuminate\Support\Facades\Route;
 
@@ -42,6 +46,12 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/vehicules', [MeController::class, 'storeVehicule']);
         Route::put('/vehicules/{vehicule}', [MeController::class, 'updateVehicule']);
         Route::delete('/vehicules/{vehicule}', [MeController::class, 'destroyVehicule']);
+
+        // Module 9 côté Client : consultation seule (§7 « Paiement : Lecture »).
+        Route::get('/factures', [MeController::class, 'factures']);
+        Route::get('/factures/{facture}/pdf', [MeController::class, 'facturePdf']);
+        Route::get('/wallet', [MeController::class, 'wallet']);
+        Route::get('/abonnements', [MeController::class, 'abonnements']);
     });
 
     // Operator/admin back-office: forbidden to the "Client" role even with a
@@ -104,6 +114,31 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::middleware('permission:audit')->group(function () {
             Route::get('/audit-logs', [AuditLogController::class, 'index']);
             Route::get('/audit-logs/export', [AuditLogController::class, 'export']);
+        });
+
+        // Paiement (Module 9) : facturation, règlements, porte-monnaie et
+        // abonnements. Le PDF est un GET, donc accessible aux rôles en lecture.
+        Route::middleware('permission:paiement')->group(function () {
+            Route::get('/factures', [FactureController::class, 'index']);
+            Route::post('/factures/generer', [FactureController::class, 'generer']);
+            Route::get('/factures/{facture}/pdf', [FactureController::class, 'pdf']);
+            Route::post('/factures/{facture}/regler', [FactureController::class, 'regler']);
+
+            Route::get('/paiements', [PaiementController::class, 'index']);
+            Route::post('/paiements/{paiement}/rembourser', [PaiementController::class, 'rembourser']);
+
+            Route::get('/wallets', [WalletController::class, 'index']);
+            Route::get('/wallets/{wallet}', [WalletController::class, 'show']);
+            Route::post('/wallets/crediter', [WalletController::class, 'crediter']);
+
+            Route::get('/abonnement-plans', [AbonnementController::class, 'plans']);
+            Route::post('/abonnement-plans', [AbonnementController::class, 'storePlan']);
+            Route::put('/abonnement-plans/{plan}', [AbonnementController::class, 'updatePlan']);
+            Route::delete('/abonnement-plans/{plan}', [AbonnementController::class, 'destroyPlan']);
+
+            Route::get('/abonnements', [AbonnementController::class, 'index']);
+            Route::post('/abonnements', [AbonnementController::class, 'souscrire']);
+            Route::post('/abonnements/{abonnement}/resilier', [AbonnementController::class, 'resilier']);
         });
 
         // Gestion Firmware (Module 13) : bibliothèque, déploiement, historique

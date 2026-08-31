@@ -8,6 +8,7 @@ import {
   CarOutlined,
   HistoryOutlined,
   IdcardOutlined,
+  FileTextOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
@@ -22,6 +23,7 @@ const items: MenuProps["items"] = [
   { key: "/client/vehicules", icon: <CarOutlined />, label: "Mes véhicules" },
   { key: "/client/historique", icon: <HistoryOutlined />, label: "Mon historique" },
   { key: "/client/badge", icon: <IdcardOutlined />, label: "Mon badge RFID" },
+  { key: "/client/factures", icon: <FileTextOutlined />, label: "Mes factures" },
 ];
 
 const titles: Record<string, string> = {
@@ -29,6 +31,7 @@ const titles: Record<string, string> = {
   "/client/vehicules": "Mes véhicules",
   "/client/historique": "Mon historique de recharge",
   "/client/badge": "Mon badge RFID",
+  "/client/factures": "Mes factures et mon porte-monnaie",
 };
 
 const MOBILE_BREAKPOINT = 900;
