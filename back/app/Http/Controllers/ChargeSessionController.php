@@ -9,7 +9,7 @@ class ChargeSessionController extends Controller
 {
     public function index(): JsonResponse
     {
-        $sessions = ChargeSession::with('borne')
+        $sessions = ChargeSession::with(['borne', 'vehicule', 'user'])
             ->latest('started_at')
             ->get()
             ->map(fn (ChargeSession $s) => $s->toFrontendArray());

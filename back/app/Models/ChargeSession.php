@@ -16,6 +16,7 @@ class ChargeSession extends Model
         'connector_id',
         'id_tag',
         'user_id',
+        'vehicule_id',
         'meter_start',
         'meter_stop',
         'energie_kwh',
@@ -42,6 +43,15 @@ class ChargeSession extends Model
         return $this->belongsTo(User::class);
     }
 
+    /**
+     * Le véhicule rechargé (§5 « Véhicule », §8 « Historique recharges »).
+     * Nul quand OCPP n'a pas permis de le déterminer — voir la migration.
+     */
+    public function vehicule(): BelongsTo
+    {
+        return $this->belongsTo(Vehicule::class);
+    }
+
     /** La facture émise pour cette session (Module 9), s'il y en a une. */
     public function facture(): HasOne
     {
@@ -50,7 +60,7 @@ class ChargeSession extends Model
 
     /**
      * Map to the shape the React app's `ChargeSession` type expects: `id`, `borne`,
-     * `connecteur`, `idTag`, `utilisateur`, `debut`, `fin`, `dureeMin`, `energieKwh`,
+     * `connecteur`, `idTag`, `utilisateur`, `vehicule`, `debut`, `fin`, `dureeMin`, `energieKwh`,
      * `prix`, `etat`.
      */
     public function toFrontendArray(): array
@@ -64,6 +74,11 @@ class ChargeSession extends Model
             'connecteur' => (string) $this->connector_id,
             'idTag' => $this->id_tag ?? '',
             'utilisateur' => $this->user?->name,
+            'vehiculeId' => $this->vehicule_id === null ? null : (string) $this->vehicule_id,
+            'vehicule' => $this->vehicule === null
+                ? null
+                : $this->vehicule->marque.' '.$this->vehicule->modele,
+            'vehiculeImmatriculation' => $this->vehicule?->immatriculation,
             'debut' => $this->started_at ? $this->started_at->toDateTimeString() : null,
             'fin' => $this->stopped_at ? $this->stopped_at->toDateTimeString() : null,
             'dureeMin' => $dureeMin,

@@ -89,6 +89,26 @@ function ClientVehicules() {
     { title: 'Connecteur', dataIndex: 'connecteur', render: (v: string) => <Tag>{v}</Tag> },
     { title: 'Capacité batterie', dataIndex: 'capaciteKwh', render: (v: number) => `${v} kWh` },
     {
+      // §8 « Historique recharges » : cumuls calculés côté serveur à partir des
+      // sessions rattachées à ce véhicule.
+      title: 'Recharges',
+      dataIndex: 'recharges',
+      render: (_: unknown, r: Vehicule) => {
+        const stats = r.recharges
+        if (!stats || stats.nombre === 0) {
+          return <span style={{ color: 'var(--text-muted)' }}>Aucune</span>
+        }
+        return (
+          <div>
+            <strong>{stats.nombre}</strong> recharge{stats.nombre > 1 ? 's' : ''}
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {stats.energieKwh.toFixed(1)} kWh · {stats.coutDt.toFixed(3)} DT
+            </div>
+          </div>
+        )
+      },
+    },
+    {
       title: '',
       dataIndex: 'action',
       render: (_: unknown, r: Vehicule) => (

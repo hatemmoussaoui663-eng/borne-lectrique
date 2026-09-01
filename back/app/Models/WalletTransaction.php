@@ -24,6 +24,7 @@ class WalletTransaction extends Model
         'motif',
         'facture_id',
         'effectue_par',
+        'annule_par_id',
     ];
 
     protected $casts = [
@@ -37,6 +38,24 @@ class WalletTransaction extends Model
         return $this->belongsTo(Wallet::class);
     }
 
+    /** Le débit qui contre-passe ce rechargement, s'il a été annulé. */
+    public function annulePar(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'annule_par_id');
+    }
+
+    /** Un rechargement déjà annulé ne peut pas l'être une seconde fois. */
+    public function estAnnule(): bool
+    {
+        return $this->annule_par_id !== null;
+    }
+
+    /** Seul un rechargement encore actif se prête à une annulation. */
+    public function estAnnulable(): bool
+    {
+        return $this->type === self::TYPE_CREDIT && ! $this->estAnnule();
+    }
+
     public function toFrontendArray(): array
     {
         return [
@@ -46,6 +65,8 @@ class WalletTransaction extends Model
             'soldeApres' => (float) $this->solde_apres,
             'motif' => $this->motif,
             'factureId' => $this->facture_id === null ? null : (string) $this->facture_id,
+            'annule' => $this->estAnnule(),
+            'annulable' => $this->estAnnulable(),
             'date' => $this->created_at?->toDateTimeString(),
         ];
     }

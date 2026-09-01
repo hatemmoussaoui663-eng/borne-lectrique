@@ -43,8 +43,10 @@ export interface ChargeSession {
   utilisateur?: string
   /** Raw RFID badge presented at Authorize/StartTransaction — what real OCPP sessions actually carry. */
   idTag?: string
-  /** No OCPP data source yet (needs Module 8 vehicle records) — mock data only. */
-  vehicule?: string
+  /** Véhicule rechargé (§5). `null` quand OCPP n'a pas permis de le déterminer. */
+  vehicule?: string | null
+  vehiculeId?: string | null
+  vehiculeImmatriculation?: string | null
   borne: string
   connecteur: string
   debut: string | null
@@ -103,6 +105,14 @@ export interface AuthUser {
   created_at: string
 }
 
+export interface PositionVehicule {
+  lat: number
+  lng: number
+  /** Rayon d'incertitude GPS en mètres, tel que rapporté par la source. */
+  precisionM: number | null
+  majLe: string | null
+}
+
 export interface Vehicule {
   id: string
   proprietaire: string
@@ -113,6 +123,14 @@ export interface Vehicule {
   immatriculation: string
   connecteur: ConnecteurType
   capaciteKwh: number
+  /** Dernière position connue ; `null` tant que le véhicule n'a rien émis. */
+  position?: PositionVehicule | null
+  /** Historique de recharges cumulé (§8) ; `null` si le contrôleur ne l'a pas chargé. */
+  recharges?: {
+    nombre: number
+    energieKwh: number
+    coutDt: number
+  } | null
 }
 
 export type TicketStatut = 'Ouvert' | 'Planifié' | 'En cours' | 'Résolu'
@@ -287,6 +305,10 @@ export interface WalletTransaction {
   soldeApres: number
   motif: string
   factureId: string | null
+  /** Rechargement déjà contre-passé par un débit de correction. */
+  annule: boolean
+  /** Rechargement encore actif, donc annulable une fois. */
+  annulable: boolean
   date: string
 }
 

@@ -103,6 +103,34 @@ export async function crediterWallet(
   return data
 }
 
+/**
+ * Contre-passe un rechargement saisi par erreur. Il n'existe pas de suppression :
+ * le mouvement fautif et sa correction restent tous deux à l'historique.
+ */
+export async function annulerRechargement(
+  transactionId: string,
+  motif?: string,
+): Promise<{ message: string; wallet: Wallet }> {
+  const { data } = await apiClient.post(`/wallets/transactions/${transactionId}/annuler`, {
+    motif: motif || undefined,
+  })
+  return data
+}
+
+/** Retrait libre, pour corriger un rechargement déjà partiellement dépensé. */
+export async function debiterWallet(
+  userId: string,
+  montant: number,
+  motif: string,
+): Promise<{ message: string; wallet: Wallet }> {
+  const { data } = await apiClient.post('/wallets/debiter', {
+    user_id: Number(userId),
+    montant,
+    motif,
+  })
+  return data
+}
+
 /* ---------------------------------------------------------- Abonnements --- */
 
 export interface PlanInput {

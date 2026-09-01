@@ -23,17 +23,63 @@ class MeController extends Controller
 {
     public function sessions(Request $request): JsonResponse
     {
-        $sessions = ChargeSession::with('borne')
+        $filtres = $request->validate([
+            // §8 « Historique recharges » : consulter l'historique d'une voiture
+            // précise plutôt que celui du compte entier.
+            'vehicule_id' => ['nullable', 'integer'],
+        ]);
+
+        $sessions = ChargeSession::with(['borne', 'vehicule'])
             ->where('user_id', $request->user()->id)
+            ->when(
+                $filtres['vehicule_id'] ?? null,
+                fn ($q, $id) => $q->where('vehicule_id', $id)
+            )
             ->latest()
             ->get();
 
         return response()->json($sessions->map->toFrontendArray());
     }
 
+    /**
+     * Rattache (ou détache) le véhicule d'une de mes sessions.
+     *
+     * OCPP ne dit pas quelle voiture était branchée : quand un client en
+     * possède plusieurs, la session arrive sans véhicule et c'est lui, seul à
+     * le savoir, qui complète l'information.
+     */
+    public function affecterVehicule(Request $request, ChargeSession $session): JsonResponse
+    {
+        abort_unless($session->user_id === $request->user()->id, 403);
+
+        $data = $request->validate([
+            'vehicule_id' => ['nullable', 'integer', Rule::exists('vehicules', 'id')],
+        ]);
+
+        $vehiculeId = $data['vehicule_id'] ?? null;
+
+        if ($vehiculeId !== null) {
+            // Sans ce contrôle, un client pourrait rattacher sa recharge à la
+            // voiture d'un autre — et polluer l'historique de celle-ci.
+            $vehicule = Vehicule::find($vehiculeId);
+            abort_unless($vehicule?->user_id === $request->user()->id, 403);
+        }
+
+        $session->update(['vehicule_id' => $vehiculeId]);
+        $session->load(['borne', 'vehicule']);
+
+        return response()->json($session->toFrontendArray());
+    }
+
     public function vehicules(Request $request): JsonResponse
     {
-        $vehicules = Vehicule::where('user_id', $request->user()->id)->orderBy('id')->get();
+        $vehicules = Vehicule::where('user_id', $request->user()->id)
+            // §8 : nombre de recharges, énergie et coût cumulés par véhicule.
+            ->withCount('chargeSessions')
+            ->withSum('chargeSessions', 'energie_kwh')
+            ->withSum('chargeSessions', 'prix')
+            ->orderBy('id')
+            ->get();
 
         return response()->json($vehicules->map->toFrontendArray());
     }
@@ -112,6 +158,41 @@ class MeController extends Controller
         $vehicule->delete();
 
         return response()->json(['message' => 'Véhicule supprimé.']);
+    }
+
+    /**
+     * Position GPS transmise par le véhicule (suivi temps réel).
+     *
+     * Émise par le navigateur embarqué (API Geolocation) ou, à terme, par un
+     * boîtier télématique : même contrat des deux côtés, un simple POST du
+     * couple lat/lng. Rien d'autre n'est nécessaire pour brancher un traceur
+     * réel à la place du téléphone.
+     *
+     * `saveQuietly` : une position arrive toutes les quelques secondes, la
+     * tracer au journal d'audit (Module 18) le noierait sous des lignes
+     * « Modification : Véhicule » sans intérêt pour un auditeur.
+     */
+    public function majPosition(Request $request, Vehicule $vehicule): JsonResponse
+    {
+        abort_unless($vehicule->user_id === $request->user()->id, 403);
+
+        $data = $request->validate([
+            'lat' => 'required|numeric|between:-90,90',
+            'lng' => 'required|numeric|between:-180,180',
+            // Rayon d'incertitude en mètres, tel que rapporté par la source.
+            'precision_m' => 'nullable|numeric|min:0|max:100000',
+        ]);
+
+        $vehicule->forceFill([
+            'latitude' => $data['lat'],
+            'longitude' => $data['lng'],
+            'position_precision_m' => isset($data['precision_m'])
+                ? (int) round($data['precision_m'])
+                : null,
+            'position_maj_le' => now(),
+        ])->saveQuietly();
+
+        return response()->json($vehicule->toFrontendArray());
     }
 
     private function validatedVehicule(Request $request, ?Vehicule $vehicule = null): array

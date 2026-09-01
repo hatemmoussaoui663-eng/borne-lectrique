@@ -52,6 +52,23 @@ function Sessions() {
       dataIndex: 'utilisateur',
       render: (_: string | undefined, r: ChargeSession) => r.utilisateur ?? r.idTag ?? '—',
     },
+    {
+      // §5 : le véhicule fait partie des informations d'une session. Vide quand
+      // le client possède plusieurs voitures — OCPP ne dit pas laquelle.
+      title: 'Véhicule',
+      dataIndex: 'vehicule',
+      render: (v: string | null | undefined, r: ChargeSession) =>
+        v ? (
+          <div>
+            {v}
+            <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+              {r.vehiculeImmatriculation}
+            </div>
+          </div>
+        ) : (
+          <span style={{ color: 'var(--text-muted)' }}>—</span>
+        ),
+    },
     { title: 'Borne', dataIndex: 'borne' },
     { title: 'Connecteur', dataIndex: 'connecteur' },
     { title: 'Début', dataIndex: 'debut' },

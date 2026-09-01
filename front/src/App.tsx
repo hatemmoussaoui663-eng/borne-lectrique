@@ -27,6 +27,7 @@ import ClientVehicules from "./pages/client/Vehicules";
 import ClientHistorique from "./pages/client/Historique";
 import ClientBadge from "./pages/client/Badge";
 import ClientFactures from "./pages/client/Factures";
+import ClientSuivi from "./pages/client/Suivi";
 
 // Every role except "Client" belongs on the operator/admin back-office side.
 const STAFF_ROLES = [
@@ -86,6 +87,7 @@ function App() {
         <Route path="vehicules" element={<ClientVehicules />} />
         <Route path="historique" element={<ClientHistorique />} />
         <Route path="badge" element={<ClientBadge />} />
+        <Route path="suivi" element={<ClientSuivi />} />
         <Route path="factures" element={<ClientFactures />} />
       </Route>
     </Routes>

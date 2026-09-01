@@ -130,6 +130,68 @@ class PaiementService
         });
     }
 
+    /**
+     * Retrait du porte-monnaie : correction d'un rechargement erroné, ou tout
+     * ajustement décidé au back-office.
+     *
+     * @throws RuntimeException si le solde est insuffisant
+     */
+    public function debiter(User $client, float $montant, string $motif): WalletTransaction
+    {
+        if ($montant <= 0) {
+            throw new RuntimeException('Le montant doit être positif.');
+        }
+
+        return DB::transaction(fn () => $this->retirer($client, $montant, $motif));
+    }
+
+    /**
+     * Contre-passe un rechargement saisi par erreur.
+     *
+     * Le mouvement d'origine n'est ni effacé ni modifié : on lui oppose un
+     * débit du même montant, et il est marqué comme annulé. Supprimer la ligne
+     * ferait diverger le solde de son historique — sur de l'argent client,
+     * c'est précisément ce qu'un journal doit rendre impossible.
+     *
+     * @throws RuntimeException si le mouvement n'est pas annulable ou le solde insuffisant
+     */
+    public function annulerRechargement(WalletTransaction $transaction, ?string $motif = null): WalletTransaction
+    {
+        if ($transaction->type !== WalletTransaction::TYPE_CREDIT) {
+            throw new RuntimeException(
+                "Seul un rechargement s'annule ; un débit se corrige par un nouveau rechargement."
+            );
+        }
+
+        if ($transaction->estAnnule()) {
+            throw new RuntimeException('Ce rechargement a déjà été annulé.');
+        }
+
+        $client = $transaction->wallet?->user;
+
+        if ($client === null) {
+            throw new RuntimeException("Ce mouvement n'est rattaché à aucun client.");
+        }
+
+        return DB::transaction(function () use ($transaction, $client, $motif) {
+            $correction = $this->retirer(
+                $client,
+                (float) $transaction->montant,
+                $motif ?: "Annulation du rechargement « {$transaction->motif} »",
+                messageErreur: 'Annulation impossible : le solde a déjà été dépensé '
+                    .'(%.3f DT disponibles pour un rechargement de %.3f DT). '
+                    .'Corrigez le solde à la main du montant réellement récupérable.',
+            );
+
+            // `saveQuietly` : ce champ ne fait que pointer vers la correction,
+            // il ne modifie ni le montant ni le motif d'origine.
+            $transaction->annule_par_id = $correction->id;
+            $transaction->saveQuietly();
+
+            return $correction;
+        });
+    }
+
     /** @throws RuntimeException si le client n'a pas de compte ou pas assez de solde */
     private function debiterWallet(Facture $facture): void
     {
@@ -139,27 +201,48 @@ class PaiementService
             throw new RuntimeException("Cette facture n'est rattachée à aucun client : paiement par wallet impossible.");
         }
 
+        $this->retirer(
+            $client,
+            (float) $facture->montant_ttc,
+            "Paiement de la facture {$facture->numero}",
+            $facture->id,
+            'Solde insuffisant : %.3f DT disponibles pour une facture de %.3f DT.',
+        );
+    }
+
+    /**
+     * Cœur commun de tous les retraits : verrou de ligne, contrôle du solde,
+     * écriture du mouvement. Le verrou est ce qui empêche deux retraits
+     * simultanés de lire le même solde de départ et d'en dépenser un de trop.
+     *
+     * @throws RuntimeException si le solde est insuffisant
+     */
+    private function retirer(
+        User $client,
+        float $montant,
+        string $motif,
+        ?int $factureId = null,
+        string $messageErreur = 'Solde insuffisant : %.3f DT disponibles pour un retrait de %.3f DT.',
+    ): WalletTransaction {
         $wallet = Wallet::pour($client);
         $wallet = Wallet::whereKey($wallet->id)->lockForUpdate()->first();
 
-        if ($wallet->solde + 0.0005 < $facture->montant_ttc) {
-            throw new RuntimeException(sprintf(
-                'Solde insuffisant : %.3f DT disponibles pour une facture de %.3f DT.',
-                $wallet->solde,
-                $facture->montant_ttc,
-            ));
+        // Marge de 0,0005 : les montants sont au millime, une comparaison
+        // flottante stricte refuserait un retrait du solde exact.
+        if ($wallet->solde + 0.0005 < $montant) {
+            throw new RuntimeException(sprintf($messageErreur, $wallet->solde, $montant));
         }
 
-        $wallet->solde = round($wallet->solde - $facture->montant_ttc, 3);
+        $wallet->solde = round($wallet->solde - $montant, 3);
         $wallet->save();
 
-        WalletTransaction::create([
+        return WalletTransaction::create([
             'wallet_id' => $wallet->id,
             'type' => WalletTransaction::TYPE_DEBIT,
-            'montant' => round((float) $facture->montant_ttc, 3),
+            'montant' => round($montant, 3),
             'solde_apres' => $wallet->solde,
-            'motif' => "Paiement de la facture {$facture->numero}",
-            'facture_id' => $facture->id,
+            'motif' => $motif,
+            'facture_id' => $factureId,
             'effectue_par' => Auth::id(),
         ]);
     }

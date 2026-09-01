@@ -35,6 +35,9 @@ Route::middleware('auth:sanctum')->group(function () {
     // Read-only network status, shared by staff (Bornes admin page) and the
     // "Client" role (Espace Client's availability map) alike.
     Route::get('/bornes', [BorneController::class, 'index']);
+    // Doit rester avant /bornes/{borne} : sans quoi le paramètre de route
+    // capturerait le mot « proches » et chercherait une borne d'id « proches ».
+    Route::get('/bornes/proches', [BorneController::class, 'proches']);
     Route::get('/bornes/{borne}', [BorneController::class, 'show']);
 
     // Espace Client: self-scoped endpoints, usable by any authenticated user.
@@ -46,6 +49,10 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::post('/vehicules', [MeController::class, 'storeVehicule']);
         Route::put('/vehicules/{vehicule}', [MeController::class, 'updateVehicule']);
         Route::delete('/vehicules/{vehicule}', [MeController::class, 'destroyVehicule']);
+        // Suivi GPS : position émise par le véhicule lui-même.
+        Route::post('/vehicules/{vehicule}/position', [MeController::class, 'majPosition']);
+        // §5 : compléter le véhicule d'une session qu'OCPP n'a pas su déterminer.
+        Route::put('/sessions/{session}/vehicule', [MeController::class, 'affecterVehicule']);
 
         // Module 9 côté Client : consultation seule (§7 « Paiement : Lecture »).
         Route::get('/factures', [MeController::class, 'factures']);
@@ -130,6 +137,10 @@ Route::middleware('auth:sanctum')->group(function () {
             Route::get('/wallets', [WalletController::class, 'index']);
             Route::get('/wallets/{wallet}', [WalletController::class, 'show']);
             Route::post('/wallets/crediter', [WalletController::class, 'crediter']);
+            // Correction d'un rechargement erroné. Pas de DELETE : un mouvement
+            // de porte-monnaie se contre-passe, il ne s'efface pas.
+            Route::post('/wallets/debiter', [WalletController::class, 'debiter']);
+            Route::post('/wallets/transactions/{transaction}/annuler', [WalletController::class, 'annulerTransaction']);
 
             Route::get('/abonnement-plans', [AbonnementController::class, 'plans']);
             Route::post('/abonnement-plans', [AbonnementController::class, 'storePlan']);

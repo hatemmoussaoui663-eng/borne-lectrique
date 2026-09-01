@@ -11,6 +11,7 @@ use App\Models\Borne;
 use App\Models\ChargeSession;
 use App\Models\FirmwareDeployment;
 use App\Models\Tarif;
+use App\Models\Vehicule;
 use App\Support\FacturationService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -115,6 +116,7 @@ class OcppIngestController extends Controller
             'connector_id' => $data['connectorId'],
             'id_tag' => $idTag,
             'user_id' => $badge?->user_id,
+            'vehicule_id' => $this->resolveVehiculeId($badge?->user_id),
             'meter_start' => $data['meterStart'] ?? null,
             'status' => 'En cours',
             'started_at' => now(),
@@ -294,6 +296,27 @@ class OcppIngestController extends Controller
         $badge = Badge::where('code', $idTag)->first();
 
         return $badge?->ocppStatus() ?? 'Accepted';
+    }
+
+    /**
+     * Véhicule à rattacher à une session ouverte par ce client (§5 et §8).
+     *
+     * OCPP ne transporte aucune information de véhicule : le badge identifie le
+     * porteur, pas sa voiture. On ne rattache donc que lorsqu'il n'y a aucune
+     * ambiguïté — un seul véhicule au compte. Deviner parmi plusieurs, au type
+     * de connecteur par exemple, finirait par attribuer une recharge à la
+     * mauvaise voiture, et l'erreur se propagerait jusqu'à la facturation.
+     * Une session ambiguë reste sans véhicule, à affecter depuis l'espace client.
+     */
+    private function resolveVehiculeId(?int $userId): ?int
+    {
+        if ($userId === null) {
+            return null;
+        }
+
+        $vehicules = Vehicule::where('user_id', $userId)->pluck('id');
+
+        return $vehicules->count() === 1 ? (int) $vehicules->first() : null;
     }
 
     private function resolveBorne(string $chargePointId): Borne

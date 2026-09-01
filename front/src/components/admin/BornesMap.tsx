@@ -1,5 +1,13 @@
-import { useState } from "react";
-import { MapContainer, TileLayer, Marker, Popup } from "react-leaflet";
+import { useEffect, useState } from "react";
+import {
+  MapContainer,
+  TileLayer,
+  Marker,
+  Popup,
+  Circle,
+  Polyline,
+  useMap,
+} from "react-leaflet";
 import { divIcon } from "leaflet";
 import { EnvironmentOutlined, GlobalOutlined } from "@ant-design/icons";
 import "leaflet/dist/leaflet.css";
@@ -43,11 +51,65 @@ const legend: { label: string; etat: BorneEtat }[] = [
   { label: "Défaut / hors service", etat: "Défaut" },
 ];
 
+/**
+ * Marqueur du véhicule suivi : une voiture, là où les bornes sont de simples
+ * pastilles rondes. La forme suffit alors à les distinguer, sans dépendre de la
+ * couleur — utile quand une borne « Occupée » est bleue elle aussi.
+ *
+ * SVG en dur plutôt qu'une icône Ant Design : `divIcon` attend une chaîne HTML,
+ * pas un composant React.
+ */
+const vehiculeIcon = divIcon({
+  className: "vehicule-marker",
+  html: `
+    <span class="vehicule-marker__badge">
+      <span class="vehicule-marker__ping"></span>
+      <svg class="vehicule-marker__car" viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M18.92 6.01C18.72 5.42 18.16 5 17.5 5h-11c-.66 0-1.21.42-1.42 1.01L3 12v8c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-1h12v1c0 .55.45 1 1 1h1c.55 0 1-.45 1-1v-8l-2.08-5.99zM6.5 16c-.83 0-1.5-.67-1.5-1.5S5.67 13 6.5 13s1.5.67 1.5 1.5S7.33 16 6.5 16zm11 0c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5zM5 11l1.5-4.5h11L19 11H5z"/>
+      </svg>
+    </span>
+  `,
+  iconSize: [32, 32],
+  iconAnchor: [16, 16],
+  popupAnchor: [0, -18],
+});
+
+/**
+ * `MapContainer` ne lit `center` qu'au montage : sans ce composant, la carte
+ * resterait figée pendant que le véhicule se déplace. Il ne recentre que si le
+ * point sort de la vue, pour ne pas contrarier un utilisateur en train de
+ * déplacer la carte à la main.
+ */
+function SuivrePoint({ point }: { point: [number, number] | null }) {
+  const map = useMap();
+
+  useEffect(() => {
+    if (!point) return;
+    if (!map.getBounds().contains(point)) {
+      map.setView(point, map.getZoom(), { animate: true });
+    }
+  }, [map, point]);
+
+  return null;
+}
+
+interface VehiculeSuivi {
+  lat: number;
+  lng: number;
+  label: string;
+  /** Rayon d'incertitude GPS en mètres, dessiné autour du marqueur. */
+  precisionM?: number | null;
+}
+
 interface BornesMapProps {
   bornes: Borne[];
   height?: number;
   zoom?: number;
   showLegend?: boolean;
+  /** Véhicule à afficher et à suivre (suivi GPS temps réel). */
+  vehicule?: VehiculeSuivi | null;
+  /** Borne mise en avant, reliée au véhicule par un trait. */
+  borneProcheId?: string | null;
 }
 
 function BornesMap({
@@ -55,8 +117,13 @@ function BornesMap({
   height = 380,
   zoom = 6.4,
   showLegend = true,
+  vehicule = null,
+  borneProcheId = null,
 }: BornesMapProps) {
   const [mode, setMode] = useState<MapMode>("street");
+  const borneProche = borneProcheId
+    ? (bornes.find((b) => b.id === borneProcheId) ?? null)
+    : null;
 
   return (
     <div>
@@ -79,7 +146,7 @@ function BornesMap({
         </div>
 
         <MapContainer
-          center={TUNISIA_CENTER}
+          center={vehicule ? [vehicule.lat, vehicule.lng] : TUNISIA_CENTER}
           zoom={zoom}
           scrollWheelZoom
           style={{ height: "100%", width: "100%", background: "#0f2417" }}
@@ -147,6 +214,48 @@ function BornesMap({
               </Popup>
             </Marker>
           ))}
+
+          {vehicule && (
+            <>
+              <SuivrePoint point={[vehicule.lat, vehicule.lng]} />
+
+              {/* Trait vers la borne la plus proche : répond d'un coup d'œil à
+                  « laquelle est la plus proche de ma voiture ? » */}
+              {borneProche && (
+                <Polyline
+                  positions={[
+                    [vehicule.lat, vehicule.lng],
+                    [borneProche.lat, borneProche.lng],
+                  ]}
+                  pathOptions={{ color: "#6fe45c", weight: 2, dashArray: "6 6", opacity: 0.85 }}
+                />
+              )}
+
+              {/* Cercle d'incertitude : un point GPS sans sa précision laisse
+                  croire à une exactitude qu'on n'a pas. */}
+              {vehicule.precisionM ? (
+                <Circle
+                  center={[vehicule.lat, vehicule.lng]}
+                  radius={vehicule.precisionM}
+                  pathOptions={{ color: "#4da3ff", weight: 1, fillOpacity: 0.12 }}
+                />
+              ) : null}
+
+              <Marker position={[vehicule.lat, vehicule.lng]} icon={vehiculeIcon}>
+                <Popup>
+                  <div className="borne-popup">
+                    <strong>{vehicule.label}</strong>
+                    <span>Position actuelle</span>
+                    {vehicule.precisionM ? (
+                      <span className="borne-popup__meta">
+                        Précision ~{Math.round(vehicule.precisionM)} m
+                      </span>
+                    ) : null}
+                  </div>
+                </Popup>
+              </Marker>
+            </>
+          )}
         </MapContainer>
       </div>
 

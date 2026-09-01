@@ -24,6 +24,8 @@ import {
   DeleteOutlined,
   ReloadOutlined,
   FileAddOutlined,
+  UndoOutlined,
+  MinusCircleOutlined,
 } from '@ant-design/icons'
 import dayjs from 'dayjs'
 import {
@@ -35,6 +37,9 @@ import {
   rembourserPaiement,
   getWallets,
   crediterWallet,
+  getWallet,
+  annulerRechargement,
+  debiterWallet,
   getPlans,
   createPlan,
   updatePlan,
@@ -124,11 +129,16 @@ function PaiementPage() {
   const [aRembourser, setARembourser] = useState<Paiement | null>(null)
   const [motif, setMotif] = useState('')
   const [creditOuvert, setCreditOuvert] = useState(false)
+  // Les mouvements ne sont pas dans /wallets : on les charge au dépliage de la
+  // ligne, et on les garde pour ne pas refaire l'appel à chaque ouverture.
+  const [mouvements, setMouvements] = useState<Record<string, Wallet>>({})
+  const [debitOuvert, setDebitOuvert] = useState(false)
   const [planEdite, setPlanEdite] = useState<AbonnementPlan | null>(null)
   const [planModalOuvert, setPlanModalOuvert] = useState(false)
   const [souscriptionOuverte, setSouscriptionOuverte] = useState(false)
 
   const [formCredit] = Form.useForm<{ userId: string; montant: number; motif?: string }>()
+  const [formDebit] = Form.useForm<{ userId: string; montant: number; motif: string }>()
   const [formPlan] = Form.useForm<PlanInput>()
   const [formSouscription] = Form.useForm<{ userId: string; planId: string }>()
 
@@ -228,6 +238,43 @@ function PaiementPage() {
       await load()
     } catch (error) {
       message.error(messageErreur(error, 'Rechargement impossible.'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function chargerMouvements(walletId: string) {
+    try {
+      // L'appel doit être résolu avant le setState : `await` n'a pas sa place
+      // dans le callback de mise à jour, qui n'est pas asynchrone.
+      const detail = await getWallet(walletId)
+      setMouvements((prev) => ({ ...prev, [walletId]: detail }))
+    } catch {
+      message.error('Impossible de charger les mouvements de ce porte-monnaie.')
+    }
+  }
+
+  async function handleAnnuler(walletId: string, transactionId: string) {
+    try {
+      const reponse = await annulerRechargement(transactionId)
+      message.success(reponse.message)
+      setMouvements((prev) => ({ ...prev, [walletId]: reponse.wallet }))
+      await load()
+    } catch (error) {
+      message.error(messageErreur(error, 'Annulation impossible.'))
+    }
+  }
+
+  async function handleDebiter(values: { userId: string; montant: number; motif: string }) {
+    try {
+      setSaving(true)
+      const reponse = await debiterWallet(values.userId, values.montant, values.motif)
+      message.success(reponse.message)
+      setMouvements((prev) => ({ ...prev, [reponse.wallet.id]: reponse.wallet }))
+      setDebitOuvert(false)
+      await load()
+    } catch (error) {
+      message.error(messageErreur(error, 'Correction impossible.'))
     } finally {
       setSaving(false)
     }
@@ -647,16 +694,27 @@ function PaiementPage() {
                     <p style={{ margin: 0, color: 'var(--text-muted)' }}>
                       Le porte-monnaie est créé au premier rechargement.
                     </p>
-                    <Button
-                      type="primary"
-                      icon={<WalletOutlined />}
-                      onClick={() => {
-                        formCredit.resetFields()
-                        setCreditOuvert(true)
-                      }}
-                    >
-                      Recharger un porte-monnaie
-                    </Button>
+                    <div style={{ display: 'flex', gap: 8 }}>
+                      <Button
+                        icon={<MinusCircleOutlined />}
+                        onClick={() => {
+                          formDebit.resetFields()
+                          setDebitOuvert(true)
+                        }}
+                      >
+                        Corriger un solde
+                      </Button>
+                      <Button
+                        type="primary"
+                        icon={<WalletOutlined />}
+                        onClick={() => {
+                          formCredit.resetFields()
+                          setCreditOuvert(true)
+                        }}
+                      >
+                        Recharger un porte-monnaie
+                      </Button>
+                    </div>
                   </div>
                 )}
                 <div className="panel">
@@ -668,33 +726,67 @@ function PaiementPage() {
                     pagination={false}
                     locale={{ emptyText: 'Aucun porte-monnaie ouvert.' }}
                     expandable={{
-                      expandedRowRender: (w) => (
-                        <table className="mini-table" style={{ maxWidth: 720 }}>
-                          <thead>
-                            <tr>
-                              <th>Date</th>
-                              <th>Motif</th>
-                              <th>Mouvement</th>
-                              <th>Solde après</th>
-                            </tr>
-                          </thead>
-                          <tbody>
-                            {(w.transactions ?? []).map((t) => (
-                              <tr key={t.id}>
-                                <td>{dayjs(t.date).format('DD/MM/YYYY HH:mm')}</td>
-                                <td>{t.motif}</td>
-                                <td style={{ color: t.type === 'credit' ? '#237804' : '#cf1322' }}>
-                                  {t.type === 'credit' ? '+' : '−'} {dt(t.montant)}
-                                </td>
-                                <td>{dt(t.soldeApres)}</td>
+                      // Les mouvements ne sont pas dans /wallets : on les
+                      // demande au dépliage, une seule fois par porte-monnaie.
+                      onExpand: (ouvert, w) => {
+                        if (ouvert && !mouvements[w.id]) void chargerMouvements(w.id)
+                      },
+                      rowExpandable: () => true,
+                      expandedRowRender: (w) => {
+                        const detail = mouvements[w.id]
+                        if (!detail) {
+                          return <span style={{ color: 'var(--text-muted)' }}>Chargement…</span>
+                        }
+                        const lignes = detail.transactions ?? []
+                        if (lignes.length === 0) {
+                          return <span style={{ color: 'var(--text-muted)' }}>Aucun mouvement.</span>
+                        }
+                        return (
+                          <table className="mini-table" style={{ maxWidth: 860 }}>
+                            <thead>
+                              <tr>
+                                <th>Date</th>
+                                <th>Motif</th>
+                                <th>Mouvement</th>
+                                <th>Solde après</th>
+                                <th />
                               </tr>
-                            ))}
-                          </tbody>
-                        </table>
-                      ),
-                      // Les mouvements ne sont chargés que par /wallets/{id} :
-                      // la liste n'en renvoie pas, inutile d'ouvrir une ligne vide.
-                      rowExpandable: (w) => (w.transactions ?? []).length > 0,
+                            </thead>
+                            <tbody>
+                              {lignes.map((t) => (
+                                <tr key={t.id} style={{ opacity: t.annule ? 0.55 : 1 }}>
+                                  <td>{dayjs(t.date).format('DD/MM/YYYY HH:mm')}</td>
+                                  <td>
+                                    {t.motif}
+                                    {t.annule && (
+                                      <Tag color="default" style={{ marginLeft: 6 }}>
+                                        annulé
+                                      </Tag>
+                                    )}
+                                  </td>
+                                  <td style={{ color: t.type === 'credit' ? '#237804' : '#cf1322' }}>
+                                    {t.type === 'credit' ? '+' : '−'} {dt(t.montant)}
+                                  </td>
+                                  <td>{dt(t.soldeApres)}</td>
+                                  <td>
+                                    {canWrite && t.annulable && (
+                                      <Popconfirm
+                                        title="Annuler ce rechargement ?"
+                                        description="Un débit de correction sera ajouté ; les deux mouvements resteront visibles."
+                                        onConfirm={() => void handleAnnuler(w.id, t.id)}
+                                      >
+                                        <Button size="small" icon={<UndoOutlined />}>
+                                          Annuler
+                                        </Button>
+                                      </Popconfirm>
+                                    )}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )
+                      },
                     }}
                   />
                 </div>
@@ -841,6 +933,43 @@ function PaiementPage() {
           </Form.Item>
           <Form.Item label="Motif" name="motif">
             <Input placeholder="Rechargement en agence…" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Corriger un solde"
+        open={debitOuvert}
+        onCancel={() => setDebitOuvert(false)}
+        onOk={() => formDebit.submit()}
+        confirmLoading={saving}
+        okText="Débiter"
+        cancelText="Annuler"
+        destroyOnHidden
+      >
+        <p style={{ marginTop: 0, color: 'var(--text-muted)' }}>
+          Retrait manuel, à utiliser quand un rechargement erroné a déjà été partiellement
+          dépensé et ne peut plus être annulé en bloc. Pour annuler un rechargement intact,
+          dépliez la ligne du client et utilisez « Annuler ».
+        </p>
+        <Form form={formDebit} layout="vertical" onFinish={(v) => void handleDebiter(v)}>
+          <Form.Item label="Client" name="userId" rules={[{ required: true }]}>
+            <Select
+              showSearch
+              optionFilterProp="label"
+              placeholder="Choisir un client"
+              options={clients.map((c) => ({ label: c.nom, value: c.id }))}
+            />
+          </Form.Item>
+          <Form.Item label="Montant à retirer (DT)" name="montant" rules={[{ required: true }]}>
+            <InputNumber min={0.001} max={100000} step={10} style={{ width: '100%' }} />
+          </Form.Item>
+          <Form.Item
+            label="Motif"
+            name="motif"
+            rules={[{ required: true, message: 'Un motif est obligatoire pour tracer la correction' }]}
+          >
+            <Input placeholder="Correction d'un rechargement erroné…" />
           </Form.Item>
         </Form>
       </Modal>

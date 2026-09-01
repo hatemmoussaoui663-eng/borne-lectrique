@@ -9,6 +9,7 @@ import {
   HistoryOutlined,
   IdcardOutlined,
   FileTextOutlined,
+  AimOutlined,
   MenuFoldOutlined,
   MenuUnfoldOutlined,
   LogoutOutlined,
@@ -21,6 +22,7 @@ const { Sider, Header, Content } = Layout;
 const items: MenuProps["items"] = [
   { key: "/client", icon: <ThunderboltOutlined />, label: "Bornes disponibles" },
   { key: "/client/vehicules", icon: <CarOutlined />, label: "Mes véhicules" },
+  { key: "/client/suivi", icon: <AimOutlined />, label: "Suivi de ma voiture" },
   { key: "/client/historique", icon: <HistoryOutlined />, label: "Mon historique" },
   { key: "/client/badge", icon: <IdcardOutlined />, label: "Mon badge RFID" },
   { key: "/client/factures", icon: <FileTextOutlined />, label: "Mes factures" },
@@ -29,6 +31,7 @@ const items: MenuProps["items"] = [
 const titles: Record<string, string> = {
   "/client": "Bornes disponibles",
   "/client/vehicules": "Mes véhicules",
+  "/client/suivi": "Suivi GPS de ma voiture",
   "/client/historique": "Mon historique de recharge",
   "/client/badge": "Mon badge RFID",
   "/client/factures": "Mes factures et mon porte-monnaie",

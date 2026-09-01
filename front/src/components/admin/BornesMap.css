@@ -177,3 +177,43 @@
   border-radius: 50%;
   flex-shrink: 0;
 }
+
+/* Marqueur du véhicule suivi (suivi GPS). Plus gros que les pastilles de bornes
+   et porteur d'une silhouette de voiture : sur une carte qui compte des dizaines
+   de points, la sienne doit se repérer sans lire la légende. */
+.vehicule-marker__badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #4da3ff;
+  border: 3px solid #fff;
+  box-shadow: 0 0 12px rgba(77, 163, 255, 0.9);
+  position: relative;
+}
+
+/* Blanche sur le fond bleu : c'est le contraste qui la rend lisible à 18 px,
+   pas le détail du dessin. */
+.vehicule-marker__car {
+  width: 19px;
+  height: 19px;
+  fill: #fff;
+  /* Le SVG est au-dessus de l'onde, qui sinon le traverserait visuellement. */
+  position: relative;
+  z-index: 1;
+}
+
+.vehicule-marker__ping {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  border: 2px solid #4da3ff;
+  animation: vehicule-ping 1.8s ease-out infinite;
+}
+
+@keyframes vehicule-ping {
+  0% { transform: scale(0.7); opacity: 0.9; }
+  100% { transform: scale(1.9); opacity: 0; }
+}

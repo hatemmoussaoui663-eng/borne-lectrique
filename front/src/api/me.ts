@@ -1,8 +1,25 @@
 import { apiClient } from './client'
 import type { ChargeSession, Vehicule } from '../types'
 
-export async function getMySessions(): Promise<ChargeSession[]> {
-  const { data } = await apiClient.get<ChargeSession[]>('/me/sessions')
+export async function getMySessions(vehiculeId?: string): Promise<ChargeSession[]> {
+  const { data } = await apiClient.get<ChargeSession[]>('/me/sessions', {
+    params: { vehicule_id: vehiculeId || undefined },
+  })
+  return data
+}
+
+/**
+ * Rattache un véhicule à l'une de mes sessions, ou le détache (`null`).
+ * OCPP ne dit pas quelle voiture était branchée : quand j'en ai plusieurs,
+ * c'est moi qui complète l'information.
+ */
+export async function affecterVehiculeSession(
+  sessionId: string,
+  vehiculeId: string | null,
+): Promise<ChargeSession> {
+  const { data } = await apiClient.put<ChargeSession>(`/me/sessions/${sessionId}/vehicule`, {
+    vehicule_id: vehiculeId === null ? null : Number(vehiculeId),
+  })
   return data
 }
 
