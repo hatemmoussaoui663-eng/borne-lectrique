@@ -63,6 +63,16 @@
   color: var(--accent) !important;
 }
 
+/* Libellé + pastille de non-lus (Module 16). Le compteur est poussé à droite
+   pour rester aligné d'une entrée à l'autre quelle que soit la longueur du
+   libellé. */
+.admin-menu__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
 .admin-sider__menu .ant-menu-item:hover {
   color: var(--text-primary) !important;
 }

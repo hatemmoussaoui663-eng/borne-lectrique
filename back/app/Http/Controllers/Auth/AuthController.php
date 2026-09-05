@@ -9,6 +9,8 @@ use App\Http\Requests\Auth\ResetPasswordRequest;
 use App\Http\Resources\UserResource;
 use App\Models\AuditLog;
 use App\Models\User;
+use App\Notifications\ReinitialisationMotDePasse;
+use Illuminate\Auth\Events\PasswordResetLinkSent;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -96,18 +98,56 @@ class AuthController extends Controller
 
     public function forgotPassword(ForgotPasswordRequest $request): JsonResponse
     {
+        $canal = $request->canal();
+
+        // Le broker ne sait chercher que par email : un numéro de téléphone
+        // est donc d'abord résolu en compte, puis on lui passe l'email trouvé.
+        if ($canal === ReinitialisationMotDePasse::CANAL_SMS) {
+            $candidats = User::candidatsParNumeroDeTelephone((string) $request->input('phone'));
+
+            if ($candidats->isEmpty()) {
+                throw ValidationException::withMessages([
+                    'message' => ['Aucun compte ne correspond à ce numéro de téléphone.'],
+                ]);
+            }
+
+            // Plusieurs comptes partagent ce numéro : en choisir un enverrait
+            // un lien de réinitialisation au mauvais utilisateur.
+            if ($candidats->count() > 1) {
+                throw ValidationException::withMessages([
+                    'message' => ['Ce numéro est associé à plusieurs comptes. Utilisez votre adresse email.'],
+                ]);
+            }
+
+            $identifiant = ['email' => $candidats->first()->email];
+        } else {
+            $identifiant = $request->only('email');
+        }
+
+        // Le callback remplace l'envoi par défaut sans rien changer au reste :
+        // création du token, throttle et usage unique restent gérés par le
+        // broker, seul le canal de livraison diffère.
         $status = Password::sendResetLink(
-            $request->only('email')
+            $identifiant,
+            function (User $utilisateur, string $token) use ($canal): void {
+                $utilisateur->notify(new ReinitialisationMotDePasse($token, $canal));
+
+                event(new PasswordResetLinkSent($utilisateur));
+            }
         );
 
         if ($status === Password::RESET_LINK_SENT) {
             return response()->json([
-                'message' => 'Un lien de réinitialisation a été envoyé à votre adresse email.',
+                'message' => $canal === ReinitialisationMotDePasse::CANAL_SMS
+                    ? 'Un lien de réinitialisation a été envoyé par SMS.'
+                    : 'Un lien de réinitialisation a été envoyé à votre adresse email.',
             ]);
         }
 
         throw ValidationException::withMessages([
-            'message' => ['Impossible d\'envoyer le lien de réinitialisation.'],
+            'message' => [$status === Password::RESET_THROTTLED
+                ? 'Une demande vient déjà d\'être envoyée. Patientez une minute avant de réessayer.'
+                : 'Impossible d\'envoyer le lien de réinitialisation.'],
         ]);
     }
 

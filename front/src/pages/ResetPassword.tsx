@@ -8,7 +8,9 @@ import './Login.css'
 function ResetPassword() {
   const [searchParams] = useSearchParams()
   const token = searchParams.get('token') ?? ''
-  const [email, setEmail] = useState('')
+  // Le lien recu par email porte deja l'adresse : la pre-remplir evite une
+  // saisie inutile, et surtout une erreur si le compte a plusieurs adresses.
+  const [email, setEmail] = useState(searchParams.get('email') ?? '')
   const [password, setPassword] = useState('')
   const [passwordConfirmation, setPasswordConfirmation] = useState('')
   const [loading, setLoading] = useState(false)

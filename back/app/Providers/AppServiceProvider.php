@@ -2,7 +2,9 @@
 
 namespace App\Providers;
 
+use App\Contracts\PasserelleSms;
 use App\Observers\AuditObserver;
+use App\Services\Sms\SmsJournalise;
 use Illuminate\Support\ServiceProvider;
 
 class AppServiceProvider extends ServiceProvider
@@ -12,7 +14,9 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        $this->app->bind(PasserelleSms::class, fn () => match (config('sms.passerelle')) {
+            default => new SmsJournalise(),
+        });
     }
 
     /**

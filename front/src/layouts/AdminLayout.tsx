@@ -1,6 +1,12 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import {
+  EVENEMENT_DOCUMENTS_CHANGES,
+  signalerNouveauxDocuments,
+  getCompteurDocumentsNonLus,
+} from "../api/documents";
 import { Layout, Menu, Badge, Avatar, Dropdown, Input } from "antd";
 import type { MenuProps } from "antd";
 import {
@@ -113,6 +119,11 @@ const titles: Record<string, string> = {
 
 const MOBILE_BREAKPOINT = 900;
 
+/** Relecture du compteur de documents non lus, en millisecondes. Assez espacé
+ *  pour rester anodin sur toutes les pages de l'admin, assez court pour qu'un
+ *  dépôt se signale sans attendre une navigation. */
+const DELAI_RELECTURE_MS = 60_000;
+
 function AdminLayout() {
   // Desktop: true/false toggles the icon-rail collapse. Mobile: true/false
   // toggles the off-canvas drawer (see the max-width:900px rules in AdminLayout.css).
@@ -123,9 +134,79 @@ function AdminLayout() {
   const location = useLocation();
   const navigate = useNavigate();
 
+  // Documents jamais ouverts par cet utilisateur (Module 16). Relu à chaque
+  // navigation, périodiquement, et sur signal de la page Documents — qui
+  // éteint le marqueur sans changer d'URL.
+  const [documentsNonLus, setDocumentsNonLus] = useState(0);
+  const precedentNonLus = useRef(0);
+  // Le tout premier relevé ne compare rien : sans ce garde-fou, arriver sur
+  // l'application avec des pièces en attente passerait pour une arrivée.
+  const referenceEtablie = useRef(false);
+
+  const peutVoirDocuments = can("documents");
+
+  useEffect(() => {
+    if (!peutVoirDocuments) return;
+
+    let abandonne = false;
+    const rafraichir = () => {
+      void getCompteurDocumentsNonLus()
+        .then((total) => {
+          if (abandonne) return;
+          // Comparaison via une ref, jamais dans un updater de state : React
+          // rejoue ces fonctions en StrictMode et l'événement partirait deux
+          // fois, donc la page rechargerait en double.
+          if (referenceEtablie.current && total > precedentNonLus.current) {
+            signalerNouveauxDocuments();
+          }
+          precedentNonLus.current = total;
+          referenceEtablie.current = true;
+          setDocumentsNonLus(total);
+        })
+        // Silencieux : une pastille absente vaut mieux qu'un bandeau d'erreur
+        // sur toutes les pages de l'application.
+        .catch(() => undefined);
+    };
+
+    rafraichir();
+    // Un dépôt fait ailleurs n'atteint pas cet onglet : sans relecture
+    // périodique, la pastille n'apparaîtrait qu'à la prochaine navigation.
+    const minuterie = window.setInterval(rafraichir, DELAI_RELECTURE_MS);
+    window.addEventListener(EVENEMENT_DOCUMENTS_CHANGES, rafraichir);
+
+    return () => {
+      abandonne = true;
+      window.clearInterval(minuterie);
+      window.removeEventListener(EVENEMENT_DOCUMENTS_CHANGES, rafraichir);
+    };
+  }, [peutVoirDocuments, location.pathname]);
+
   const items = useMemo(
-    () => allItems.filter((item) => !item.module || can(item.module)),
-    [can],
+    () =>
+      allItems
+        .filter((item) => !item.module || can(item.module))
+        .map((item) =>
+          item.key === "/dashboard/documents" && documentsNonLus > 0
+            ? {
+                ...item,
+                // Le point sur l'icone plutot que sur le seul libelle : antd
+                // masque les libelles quand le menu est replie en rail, et
+                // l'alerte disparaitrait avec eux.
+                icon: (
+                  <Badge dot offset={[2, 0]}>
+                    {(item as { icon?: ReactNode }).icon}
+                  </Badge>
+                ),
+                label: (
+                  <span className="admin-menu__label">
+                    Documents
+                    <Badge count={documentsNonLus} size="small" />
+                  </span>
+                ),
+              }
+            : item,
+        ),
+    [can, documentsNonLus],
   );
 
   const selectedKey = useMemo(() => {

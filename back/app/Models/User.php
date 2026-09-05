@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Database\Factories\UserFactory;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
@@ -34,6 +35,79 @@ class User extends Authenticatable
             'password' => 'hashed',
             'is_active' => 'boolean',
         ];
+    }
+
+    /**
+     * Numero utilise par le canal SMS des notifications.
+     */
+    public function routeNotificationForSms(): ?string
+    {
+        return $this->phone;
+    }
+
+    /**
+     * Separateurs tolérés dans un numéro saisi ou stocké. Volontairement aligné
+     * sur la validation de ForgotPasswordRequest.
+     */
+    private const SEPARATEURS_TELEPHONE = [' ', '+', '(', ')', '.', '-'];
+
+    /**
+     * Comptes pouvant correspondre à un numéro saisi librement.
+     *
+     * On compare les chiffres seuls, pour que « 22 410 552 » retrouve un compte
+     * enregistré « +21622410552 » sans imposer de format. Un numéro identique
+     * au chiffre près l'emporte sur une simple correspondance de fin : sans
+     * cela, « 22410552 » resterait ambigu entre le compte qui porte exactement
+     * ce numéro et celui qui le porte précédé de son indicatif.
+     *
+     * @return \Illuminate\Database\Eloquent\Collection<int, self>
+     */
+    public static function candidatsParNumeroDeTelephone(string $numero): Collection
+    {
+        $chiffres = preg_replace('/\D/', '', $numero) ?? '';
+
+        // En dessous de 8 chiffres un suffixe n'est plus discriminant : on
+        // préfère ne rien renvoyer plutôt que de désigner le compte d'un tiers.
+        if (strlen($chiffres) < 8) {
+            return new Collection();
+        }
+
+        $chiffresStockes = self::expressionChiffresStockes();
+
+        $exacts = self::query()
+            ->whereNotNull('phone')
+            ->whereRaw("{$chiffresStockes} = ?", [$chiffres])
+            ->get();
+
+        if ($exacts->isNotEmpty()) {
+            return $exacts;
+        }
+
+        return self::query()
+            ->whereNotNull('phone')
+            ->whereRaw("{$chiffresStockes} LIKE ?", ['%'.$chiffres])
+            ->get();
+    }
+
+    /**
+     * Expression SQL réduisant la colonne « phone » à ses seuls chiffres.
+     *
+     * REGEXP_REPLACE serait plus lisible mais n'existe pas sous SQLite, sur
+     * lequel tourne la suite de tests : une pile de REPLACE reste comprise par
+     * tous les moteurs. Les séparateurs venant d'une constante de classe, il
+     * n'y a rien d'interpolable ici.
+     */
+    private static function expressionChiffresStockes(): string
+    {
+        return array_reduce(
+            self::SEPARATEURS_TELEPHONE,
+            static fn (string $expression, string $separateur): string => sprintf(
+                "REPLACE(%s, '%s', '')",
+                $expression,
+                $separateur,
+            ),
+            'phone',
+        );
     }
 
     public function role()

@@ -178,6 +178,16 @@ export interface DocumentFichier {
   expire: boolean
   ajoutePar: string | null
   ajouteLe: string
+  /** Jamais ouvert par l'utilisateur courant : signalé comme nouveau (Module 16). */
+  nonLu: boolean
+  /** Rôles visés. Liste vide = document général, visible de tous les métiers. */
+  destinataires: RoleDestinataire[]
+}
+
+/** Rôle proposable comme destinataire d'un document (Module 16). */
+export interface RoleDestinataire {
+  id: string
+  nom: string
 }
 
 /** Actions tracées par le journal d'audit (Module 18). */

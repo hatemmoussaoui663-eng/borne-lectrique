@@ -56,6 +56,19 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Frontend URL
+    |--------------------------------------------------------------------------
+    |
+    | Racine du SPA React. L'API ne sert aucune vue : les liens envoyes par
+    | email (reinitialisation de mot de passe) doivent pointer ici et non sur
+    | APP_URL, qui n'expose que /api.
+    |
+    */
+
+    'frontend_url' => env('FRONTEND_URL', 'http://localhost:5173'),
+
+    /*
+    |--------------------------------------------------------------------------
     | Application Timezone
     |--------------------------------------------------------------------------
     |

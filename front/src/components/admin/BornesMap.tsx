@@ -162,6 +162,12 @@ function BornesMap({
                 // Noirci par CSS (voir .bornes-map__basemap) : Leaflet pose
                 // cette classe sur le conteneur de tuiles de cette couche-ci,
                 // ce qui laisse les libellés de la couche suivante intacts.
+                // La `key` n'est pas décorative : react-leaflet ne met à jour
+                // que l'`url` d'une TileLayer déjà montée, jamais sa
+                // `className`. Sans clés distinctes, React recyclerait cette
+                // couche pour l'imagerie satellite, qui hériterait alors de ce
+                // filtre et s'afficherait en gris désaturé.
+                key="street-base"
                 className="bornes-map__basemap"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Base/MapServer/tile/{z}/{y}/{x}"
                 attribution="Tiles &copy; Esri — Esri, HERE, Garmin, &copy; OpenStreetMap contributors"
@@ -170,6 +176,7 @@ function BornesMap({
               />
               {/* Couche séparée chez Esri : sans elle, la carte n'a aucun nom de ville. */}
               <TileLayer
+                key="street-labels"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
                 maxZoom={19}
                 maxNativeZoom={16}
@@ -178,11 +185,13 @@ function BornesMap({
           ) : (
             <>
               <TileLayer
+                key="satellite-imagery"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}"
                 attribution="Tiles &copy; Esri — Source: Esri, Maxar, Earthstar Geographics, and the GIS User Community"
                 maxZoom={19}
               />
               <TileLayer
+                key="satellite-labels"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}"
                 maxZoom={19}
               />

@@ -71,6 +71,12 @@
   margin-bottom: 20px;
 }
 
+/* Choix du canal de recuperation (e-mail / telephone) sur la page
+   "Mot de passe oublie" : le label du champ suit juste en dessous. */
+.login__canaux {
+  margin-top: 18px;
+}
+
 .login__label {
   font-size: 13px;
   font-weight: 600;

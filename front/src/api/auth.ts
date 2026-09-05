@@ -31,8 +31,14 @@ export async function fetchCurrentUser(): Promise<CurrentUser> {
   return data
 }
 
-export async function forgotPassword(email: string): Promise<void> {
-  await apiClient.post('/auth/forgot-password', { email })
+/**
+ * Le compte peut etre designe par son email ou par son numero de telephone ;
+ * l'API en deduit le canal d'envoi (email ou SMS).
+ */
+export type IdentifiantRecuperation = { email: string } | { phone: string }
+
+export async function forgotPassword(identifiant: IdentifiantRecuperation): Promise<void> {
+  await apiClient.post('/auth/forgot-password', identifiant)
 }
 
 export async function resetPassword(payload: {

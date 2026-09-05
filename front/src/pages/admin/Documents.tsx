@@ -29,13 +29,16 @@ import {
 import dayjs, { type Dayjs } from 'dayjs'
 import {
   getDocuments,
+  getDestinatairesPossibles,
   uploadDocument,
   fetchDocumentBlob,
+  EVENEMENT_NOUVEAUX_DOCUMENTS,
+  signalerDocumentsChanges,
   deleteDocument,
 } from '../../api/documents'
 import { getBorneOptions, type BorneOption } from '../../api/bornes'
 import { useAuth } from '../../context/AuthContext'
-import type { DocumentFichier, DocumentType } from '../../types'
+import type { DocumentFichier, DocumentType, RoleDestinataire } from '../../types'
 
 /** Les cinq natures du Module 16, dans l'ordre où le cahier des charges les liste. */
 const TYPES: { value: DocumentType; label: string; color: string; icon: React.ReactNode }[] = [
@@ -71,6 +74,7 @@ interface FormValues {
   titre: string
   borneId?: string
   dateExpiration?: Dayjs
+  roleIds?: string[]
   fichier?: UploadFile[]
 }
 
@@ -93,6 +97,7 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [apercu, setApercu] = useState<{ url: string; titre: string } | null>(null)
+  const [destinataires, setDestinataires] = useState<RoleDestinataire[]>([])
   const [form] = Form.useForm<FormValues>()
   const typeChoisi = Form.useWatch('type', form)
 
@@ -110,6 +115,22 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
   useEffect(() => {
     void load()
   }, [load])
+
+  // Le layout surveille l'arrivee de nouvelles pieces pour sa pastille ; on
+  // se raccroche a sa detection plutot que d'interroger le serveur en double.
+  useEffect(() => {
+    const recharger = () => void load()
+    window.addEventListener(EVENEMENT_NOUVEAUX_DOCUMENTS, recharger)
+    return () => window.removeEventListener(EVENEMENT_NOUVEAUX_DOCUMENTS, recharger)
+  }, [load])
+
+  useEffect(() => {
+    void getDestinatairesPossibles()
+      .then(setDestinataires)
+      // Sans la liste, le champ reste vide et le document part sans ciblage :
+      // visible de tous, jamais l'inverse.
+      .catch(() => message.error('Impossible de charger la liste des rôles.'))
+  }, [])
 
   useEffect(() => {
     // Sur l'onglet d'une borne la cible est déjà connue : ni filtre ni sélecteur
@@ -134,6 +155,20 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
     setModalOpen(true)
   }
 
+  /**
+   * Le téléchargement a déjà éteint le marqueur côté serveur : on reflète
+   * l'état localement plutôt que de recharger toute la liste pour un booléen.
+   */
+  function marquerLuLocalement(id: string) {
+    setDocuments((liste) =>
+      liste.map((d) => (d.id === id ? { ...d, nonLu: false } : d)),
+    )
+
+    // Le compteur du menu vit dans le layout : il ne se recalculerait qu'a la
+    // prochaine navigation sans ce signal.
+    signalerDocumentsChanges()
+  }
+
   async function handleDownload(doc: DocumentFichier) {
     try {
       const blob = await fetchDocumentBlob(doc.id)
@@ -143,6 +178,7 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
       lien.download = doc.nomFichier
       lien.click()
       URL.revokeObjectURL(url)
+      marquerLuLocalement(doc.id)
     } catch {
       message.error('Téléchargement impossible.')
     }
@@ -152,6 +188,7 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
     try {
       const blob = await fetchDocumentBlob(doc.id)
       setApercu({ url: URL.createObjectURL(blob), titre: doc.titre })
+      marquerLuLocalement(doc.id)
     } catch {
       message.error('Aperçu indisponible.')
     }
@@ -161,6 +198,8 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
     try {
       await deleteDocument(id)
       setDocuments((prev) => prev.filter((d) => d.id !== id))
+      // Supprimer une pièce jamais ouverte fait baisser le compteur.
+      signalerDocumentsChanges()
       message.success('Document supprimé.')
     } catch {
       message.error('Suppression impossible.')
@@ -181,10 +220,12 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
         type: values.type,
         titre: values.titre,
         dateExpiration: values.dateExpiration?.format('YYYY-MM-DD') ?? null,
+        roleIds: values.roleIds ?? [],
         fichier,
       })
       setDocuments((prev) => [saved, ...prev])
       setModalOpen(false)
+      signalerDocumentsChanges()
       message.success('Document ajouté.')
     } catch {
       message.error(
@@ -216,6 +257,14 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
         render: (titre: string, r: DocumentFichier) => (
           <div>
             <strong>{titre}</strong>
+            {/* Marqueur de nouveauté : rouge et explicite plutôt qu'une simple
+                pastille, pour que la raison du signalement soit lisible sans
+                survol. Il s'éteint dès que la pièce est ouverte. */}
+            {r.nonLu && (
+              <Tag color="red" style={{ marginLeft: 8 }}>
+                Nouveau
+              </Tag>
+            )}
             <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>
               {r.nomFichier} · {formatTaille(r.taille)}
             </div>
@@ -232,6 +281,20 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
                 borne ?? <span style={{ color: 'var(--text-muted)' }}>Document général</span>,
             },
           ]),
+      {
+        title: 'Destinataires',
+        dataIndex: 'destinataires',
+        render: (roles: RoleDestinataire[]) =>
+          roles.length === 0 ? (
+            <span style={{ color: 'var(--text-muted)' }}>Tous les métiers</span>
+          ) : (
+            <>
+              {roles.map((r) => (
+                <Tag key={r.id}>{r.nom}</Tag>
+              ))}
+            </>
+          ),
+      },
       {
         title: 'Échéance',
         dataIndex: 'dateExpiration',
@@ -374,6 +437,19 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
               />
             </Form.Item>
           )}
+
+          <Form.Item
+            label="Destinataires"
+            name="roleIds"
+            extra="Laisser vide pour rendre le document visible de tous les métiers."
+          >
+            <Select
+              mode="multiple"
+              allowClear
+              placeholder="Tous les métiers"
+              options={destinataires.map((r) => ({ label: r.nom, value: r.id }))}
+            />
+          </Form.Item>
 
           {TYPES_AVEC_ECHEANCE.includes(typeChoisi) && (
             <Form.Item label="Échéance" name="dateExpiration">

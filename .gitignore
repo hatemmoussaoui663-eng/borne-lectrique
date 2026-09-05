@@ -71,3 +71,5 @@ lerna-debug.log*
 # ocpp-central-system (Node service) - node_modules/.env already covered by
 # its own .gitignore, but keep node_modules ignored here too for safety.
 /ocpp-central-system/node_modules/
+/tools/
+/mailpit.log

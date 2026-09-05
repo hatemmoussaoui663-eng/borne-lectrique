@@ -169,6 +169,10 @@ Route::middleware('auth:sanctum')->group(function () {
         // lecture seule ; l’ajout et la suppression exigent 'full'.
         Route::middleware('permission:documents')->group(function () {
             Route::get('/documents', [DocumentController::class, 'index']);
+            // Avant /documents/{document} : sans ça le segment littéral
+            // serait avalé comme un identifiant de document.
+            Route::get('/documents/compteur-non-lus', [DocumentController::class, 'compteurNonLus']);
+            Route::get('/documents/destinataires', [DocumentController::class, 'destinatairesPossibles']);
             Route::post('/documents', [DocumentController::class, 'store']);
             Route::get('/documents/{document}/download', [DocumentController::class, 'download']);
             Route::delete('/documents/{document}', [DocumentController::class, 'destroy']);
