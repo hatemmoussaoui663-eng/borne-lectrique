@@ -8,6 +8,7 @@ import {
   CarOutlined,
   HistoryOutlined,
   IdcardOutlined,
+  ExperimentOutlined,
   FileTextOutlined,
   AimOutlined,
   MenuFoldOutlined,
@@ -25,6 +26,11 @@ const items: MenuProps["items"] = [
   { key: "/client/suivi", icon: <AimOutlined />, label: "Suivi de ma voiture" },
   { key: "/client/historique", icon: <HistoryOutlined />, label: "Mon historique" },
   { key: "/client/badge", icon: <IdcardOutlined />, label: "Mon badge RFID" },
+  {
+    key: "/client/simulateur",
+    icon: <ExperimentOutlined />,
+    label: "Simulateur de recharge",
+  },
   { key: "/client/factures", icon: <FileTextOutlined />, label: "Mes factures" },
 ];
 
@@ -34,6 +40,7 @@ const titles: Record<string, string> = {
   "/client/suivi": "Suivi GPS de ma voiture",
   "/client/historique": "Mon historique de recharge",
   "/client/badge": "Mon badge RFID",
+  "/client/simulateur": "Simulateur de recharge",
   "/client/factures": "Mes factures et mon porte-monnaie",
 };
 

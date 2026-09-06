@@ -69,6 +69,19 @@ function estImage(mime: string): boolean {
   return mime.startsWith('image/')
 }
 
+function estPdf(mime: string): boolean {
+  return mime === 'application/pdf'
+}
+
+/**
+ * Formats que le navigateur affiche lui-même. Word, Excel, DWG et ZIP en sont
+ * exclus : faute de visionneuse native, un aperçu se solderait par une fenêtre
+ * vide ou un téléchargement déguisé.
+ */
+function estApercuPossible(mime: string): boolean {
+  return estImage(mime) || estPdf(mime)
+}
+
 interface FormValues {
   type: DocumentType
   titre: string
@@ -96,7 +109,7 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
   const [filtreBorne, setFiltreBorne] = useState<string | undefined>()
   const [modalOpen, setModalOpen] = useState(false)
   const [saving, setSaving] = useState(false)
-  const [apercu, setApercu] = useState<{ url: string; titre: string } | null>(null)
+  const [apercu, setApercu] = useState<{ url: string; titre: string; mime: string } | null>(null)
   const [destinataires, setDestinataires] = useState<RoleDestinataire[]>([])
   const [form] = Form.useForm<FormValues>()
   const typeChoisi = Form.useWatch('type', form)
@@ -187,7 +200,11 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
   async function handleApercu(doc: DocumentFichier) {
     try {
       const blob = await fetchDocumentBlob(doc.id)
-      setApercu({ url: URL.createObjectURL(blob), titre: doc.titre })
+      // Le type porte par la reponse peut etre generique : on le force a celui
+      // enregistre, sinon le navigateur propose un telechargement au lieu
+      // d'afficher le PDF dans le cadre.
+      const fichier = new Blob([blob], { type: doc.mime })
+      setApercu({ url: URL.createObjectURL(fichier), titre: doc.titre, mime: doc.mime })
       marquerLuLocalement(doc.id)
     } catch {
       message.error('Aperçu indisponible.')
@@ -322,7 +339,7 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
         dataIndex: 'actions',
         render: (_: unknown, r: DocumentFichier) => (
           <div style={{ display: 'flex', gap: 8 }}>
-            {estImage(r.mime) && (
+            {estApercuPossible(r.mime) && (
               <Button size="small" icon={<EyeOutlined />} onClick={() => void handleApercu(r)}>
                 Aperçu
               </Button>
@@ -488,11 +505,23 @@ function Documents({ borneId, compact = false }: DocumentsProps) {
         open={Boolean(apercu)}
         onCancel={() => setApercu(null)}
         footer={null}
-        width={720}
+        /* Un PDF a besoin de place : à 720 px la visionneuse intégrée réduit
+           la page au point de la rendre illisible. */
+        width={apercu && estPdf(apercu.mime) ? 960 : 720}
       >
-        {apercu && (
-          <Image src={apercu.url} alt={apercu.titre} style={{ width: '100%' }} preview={false} />
-        )}
+        {apercu &&
+          (estPdf(apercu.mime) ? (
+            /* Visionneuse native du navigateur plutôt qu'une bibliothèque :
+               pas de dépendance à charger, et la pagination, la recherche et
+               le zoom viennent gratuitement. */
+            <iframe
+              src={apercu.url}
+              title={apercu.titre}
+              style={{ width: '100%', height: '75vh', border: 0 }}
+            />
+          ) : (
+            <Image src={apercu.url} alt={apercu.titre} style={{ width: '100%' }} preview={false} />
+          ))}
       </Modal>
     </div>
   )

@@ -353,3 +353,26 @@ export interface Abonnement {
   debut: string | null
   fin: string | null
 }
+
+/** Rechargement du porte-monnaie par carte simulée (Module 9). */
+export interface PaiementCarte {
+  id: string
+  reference: string
+  montant: number
+  titulaire: string
+  marque: string
+  banque: string | null
+  /** Seuls les 4 derniers chiffres existent côté serveur. */
+  numeroMasque: string
+  expiration: string
+  statut: 'accepte' | 'refuse'
+  motifRefus: string | null
+  effectueLe: string
+}
+
+export interface ResultatRechargement {
+  paiement: PaiementCarte
+  /** Solde du porte-monnaie après crédit et règlement automatique. */
+  solde: number
+  facturesReglees: number
+}

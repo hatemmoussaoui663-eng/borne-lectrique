@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Table, Tag, Button, message, Spin } from 'antd'
-import { FilePdfOutlined, WalletOutlined, StarOutlined, FileTextOutlined } from '@ant-design/icons'
+import { FilePdfOutlined, WalletOutlined, StarOutlined, FileTextOutlined, CreditCardOutlined } from '@ant-design/icons'
+import ModaleRechargement from '../../components/client/ModaleRechargement'
 import dayjs from 'dayjs'
 import StatCard from '../../components/admin/StatCard'
 import {
@@ -24,14 +25,17 @@ function dt(montant: number): string {
 
 /**
  * Espace client, volet Paiement. Le §7 du cahier des charges donne au rôle
- * Client un accès « Lecture » : il consulte ses factures et les télécharge,
- * mais ne règle ni ne rembourse — ces actions restent au back-office.
+ * Client un accès « Lecture » sur le module : il ne gère ni les factures des
+ * autres, ni les remboursements. Il peut en revanche recharger son propre
+ * porte-monnaie par carte, ce qui solde automatiquement ses impayés — payer ce
+ * qu'on doit n'est pas administrer le module.
  */
 function ClientFactures() {
   const [factures, setFactures] = useState<Facture[]>([])
   const [wallet, setWallet] = useState<Wallet | null>(null)
   const [abonnement, setAbonnement] = useState<Abonnement | null>(null)
   const [loading, setLoading] = useState(true)
+  const [rechargementOuvert, setRechargementOuvert] = useState(false)
 
   useEffect(() => {
     Promise.all([getMesFactures(), getMonWallet(), getMesAbonnements()])
@@ -172,6 +176,17 @@ function ClientFactures() {
         />
       </div>
 
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+        <Button
+          type="primary"
+          size="large"
+          icon={<CreditCardOutlined />}
+          onClick={() => setRechargementOuvert(true)}
+        >
+          Recharger par carte
+        </Button>
+      </div>
+
       <div className="panel">
         <Table
           rowKey="id"
@@ -181,6 +196,19 @@ function ClientFactures() {
           locale={{ emptyText: 'Aucune facture pour le moment.' }}
         />
       </div>
+      <ModaleRechargement
+        open={rechargementOuvert}
+        onClose={() => setRechargementOuvert(false)}
+        titulaireParDefaut={wallet?.client ?? undefined}
+        onSucces={(resultat) => {
+          // Le serveur renvoie le solde après crédit et règlement : on l'applique
+          // directement, puis on relit les factures dont les statuts ont changé.
+          setWallet((precedent) =>
+            precedent ? { ...precedent, solde: resultat.solde } : precedent,
+          )
+          void getMesFactures().then(setFactures).catch(() => undefined)
+        }}
+      />
     </div>
   )
 }

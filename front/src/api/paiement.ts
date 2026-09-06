@@ -6,6 +6,8 @@ import type {
   FactureStatut,
   MoyenPaiement,
   Paiement,
+  PaiementCarte,
+  ResultatRechargement,
   Wallet,
 } from '../types'
 
@@ -206,5 +208,51 @@ export async function getMonWallet(): Promise<Wallet> {
 
 export async function getMesAbonnements(): Promise<Abonnement[]> {
   const { data } = await apiClient.get<Abonnement[]>('/me/abonnements')
+  return data
+}
+
+/**
+ * Rechargement du porte-monnaie par carte. Le numéro et le cryptogramme ne
+ * servent qu'à l'autorisation : le serveur n'en conserve que les quatre
+ * derniers chiffres, et rien n'est mémorisé côté navigateur.
+ */
+export interface RechargementInput {
+  montant: number
+  numero: string
+  titulaire: string
+  moisExpiration: number
+  anneeExpiration: number
+  cvv: string
+}
+
+export async function rechargerParCarte(input: RechargementInput): Promise<ResultatRechargement> {
+  const { data } = await apiClient.post<ResultatRechargement>('/me/rechargements', {
+    montant: input.montant,
+    numero: input.numero,
+    titulaire: input.titulaire,
+    mois_expiration: input.moisExpiration,
+    annee_expiration: input.anneeExpiration,
+    cvv: input.cvv,
+  })
+  return data
+}
+
+export async function getMesRechargements(): Promise<PaiementCarte[]> {
+  const { data } = await apiClient.get<PaiementCarte[]>('/me/rechargements')
+  return data
+}
+
+/** Préfixe de carte (BIN) et banque émettrice correspondante. */
+export interface BanqueAcceptee {
+  bin: string
+  banque: string
+}
+
+/**
+ * Banques acceptées, avec leur BIN, pour reconnaître la carte pendant la
+ * saisie. Le serveur reste seul juge : c'est un confort d'affichage.
+ */
+export async function getBanquesAcceptees(): Promise<BanqueAcceptee[]> {
+  const { data } = await apiClient.get<BanqueAcceptee[]>('/me/rechargements/banques')
   return data
 }

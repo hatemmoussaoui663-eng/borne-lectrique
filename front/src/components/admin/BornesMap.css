@@ -10,17 +10,27 @@
   font-family: var(--font-body);
 }
 
-/* Fond de carte noirci. Les tuiles Esri sont d'un gris moyen (~#3c3c3c) là où
-   l'ancien fond CARTO était quasi noir : le facteur est donc inférieur à 1,
-   là où l'ancien filtre éclaircissait (brightness 4.55). Cette valeur est le
-   seul réglage à toucher pour ajuster la noirceur.
+/* Fond de carte en gris, assombri pour le thème sombre.
+   `saturate(0)` neutralise toute teinte, `brightness` règle la profondeur.
+   Les tuiles Esri « Dark Gray » sont déjà sombres — mer #26262a, terres
+   #3f3f42, reliefs #6b6b70 — d'où un facteur inférieur à 1 : le rendu final
+   est #101010 pour la mer, #1b1b1b pour les terres, #2d2d2d pour les reliefs
+   (valeurs obtenues en appliquant les matrices de la spec CSS Filter Effects
+   à une tuile réelle). C'est le seul réglage à toucher pour éclaircir ou
+   assombrir la carte.
 
    Le filtre porte sur le fond seul, pas sur `.leaflet-tile-pane` : la couche
    des libellés vit dans le même panneau et serait assombrie avec lui, alors
-   que les noms de villes doivent au contraire ressortir sur le noir.
+   que les noms de gouvernorats doivent au contraire ressortir.
    L'imagerie satellite n'est pas concernée non plus. */
 .bornes-map__basemap {
   filter: brightness(0.42) saturate(0);
+}
+
+/* Libellés (gouvernorats, villes) : éclaircis pour se détacher nettement du
+   fond, qui est presque noir une fois filtré. */
+.bornes-map__labels {
+  filter: brightness(1.45) contrast(1.15);
 }
 
 .bornes-map__modes {

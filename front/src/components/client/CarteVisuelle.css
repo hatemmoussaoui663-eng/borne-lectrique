@@ -1,0 +1,88 @@
+/* Carte de paiement : l'illustration sert de fond, les champs saisis sont
+   superposés aux emplacements laissés libres par la puce, le sans-contact et
+   le logo du réseau. Les positions sont en pourcentage pour que la carte
+   reste juste à n'importe quelle largeur. */
+.carte-visuelle {
+  position: relative;
+  width: 100%;
+  max-width: 420px;
+  /* Rapport de l'illustration (1536 × 1024) : garantit que les champs
+     restent alignés quelle que soit la taille de rendu. */
+  aspect-ratio: 3 / 2;
+  /* Requis pour que les unités cqw ci-dessous se rapportent à la carte. */
+  container-type: inline-size;
+  margin: 0 auto 18px;
+  border-radius: 14px;
+  overflow: hidden;
+  font-family: var(--font-body, system-ui), sans-serif;
+  color: #fff;
+  /* Le texte clair doit rester lisible sur les zones bleu clair de l'image. */
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  user-select: none;
+}
+
+.carte-visuelle__fond {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.carte-visuelle__champ {
+  position: absolute;
+  line-height: 1.15;
+}
+
+.carte-visuelle__numero {
+  top: 55%;
+  left: 7%;
+  font-size: clamp(15px, 4.6cqw, 22px);
+  letter-spacing: 0.09em;
+  font-variant-numeric: tabular-nums;
+  /* Chiffres à chasse fixe : sans ça la carte tressaute à chaque frappe. */
+  font-family: "Courier New", ui-monospace, monospace;
+  font-weight: 700;
+}
+
+.carte-visuelle__titulaire {
+  top: 74%;
+  left: 7%;
+  max-width: 48%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.carte-visuelle__expiration {
+  top: 74%;
+  left: 58%;
+}
+
+.carte-visuelle__intitule {
+  display: block;
+  font-size: 9px;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  opacity: 0.75;
+  margin-bottom: 2px;
+}
+
+.carte-visuelle__valeur {
+  font-size: clamp(11px, 3.2cqw, 14px);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+/* Banque reconnue d'après le BIN : confirme au client que sa carte est
+   acceptée avant même qu'il ne valide. */
+.carte-visuelle__banque {
+  position: absolute;
+  top: 7%;
+  left: 7%;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}

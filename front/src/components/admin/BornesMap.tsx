@@ -159,9 +159,10 @@ function BornesMap({
             // agrandir les dernières plutôt que d'afficher du vide au-delà.
             <>
               <TileLayer
-                // Noirci par CSS (voir .bornes-map__basemap) : Leaflet pose
+                // Assombri par CSS (voir .bornes-map__basemap) : Leaflet pose
                 // cette classe sur le conteneur de tuiles de cette couche-ci,
-                // ce qui laisse les libellés de la couche suivante intacts.
+                // ce qui permet de traiter les libellés de la couche suivante
+                // séparément — eux sont éclaircis, pas assombris.
                 // La `key` n'est pas décorative : react-leaflet ne met à jour
                 // que l'`url` d'une TileLayer déjà montée, jamais sa
                 // `className`. Sans clés distinctes, React recyclerait cette
@@ -177,6 +178,7 @@ function BornesMap({
               {/* Couche séparée chez Esri : sans elle, la carte n'a aucun nom de ville. */}
               <TileLayer
                 key="street-labels"
+                className="bornes-map__labels"
                 url="https://server.arcgisonline.com/ArcGIS/rest/services/Canvas/World_Dark_Gray_Reference/MapServer/tile/{z}/{y}/{x}"
                 maxZoom={19}
                 maxNativeZoom={16}

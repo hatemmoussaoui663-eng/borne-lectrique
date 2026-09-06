@@ -12,6 +12,8 @@ use App\Http\Controllers\FactureController;
 use App\Http\Controllers\FirmwareController;
 use App\Http\Controllers\MaintenanceTicketController;
 use App\Http\Controllers\MeController;
+use App\Http\Controllers\RechargementCarteController;
+use App\Http\Controllers\SimulateurClientController;
 use App\Http\Controllers\OcppCommandController;
 use App\Http\Controllers\OcppIngestController;
 use App\Http\Controllers\PaiementController;
@@ -59,6 +61,19 @@ Route::middleware('auth:sanctum')->group(function () {
         Route::get('/factures/{facture}/pdf', [MeController::class, 'facturePdf']);
         Route::get('/wallet', [MeController::class, 'wallet']);
         Route::get('/abonnements', [MeController::class, 'abonnements']);
+
+        // Rechargement par carte simulée. La lecture seule de §7 porte sur
+        // l'administration du module — factures et porte-monnaie des autres —
+        // pas sur le droit d'un client à régler ce qu'il doit : ces routes ne
+        // touchent que le compte de l'appelant.
+        Route::get('/rechargements', [RechargementCarteController::class, 'index']);
+        Route::post('/rechargements', [RechargementCarteController::class, 'store']);
+        Route::get('/rechargements/banques', [RechargementCarteController::class, 'banquesAcceptees']);
+
+        // Simulateur de recharge : le navigateur joue la borne et parle OCPP
+        // au serveur central. Cette route ne fournit que le contexte de
+        // départ ; la session remonte par la voie OCPP ordinaire.
+        Route::get('/simulateur/contexte', [SimulateurClientController::class, 'contexte']);
     });
 
     // Operator/admin back-office: forbidden to the "Client" role even with a

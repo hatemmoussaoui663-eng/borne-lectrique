@@ -1,0 +1,346 @@
+/* Simulateur de recharge : borne — badge — voiture, alignés sur une scène
+   unique. Les trois visuels gardent leurs proportions ; seuls le câble et le
+   badge s'animent, pour que l'œil suive l'enchaînement OCPP. */
+
+.simu-scene {
+  position: relative;
+  display: grid;
+  grid-template-columns: 1fr 0.8fr 1.4fr;
+  align-items: center;
+  gap: 12px;
+  padding: 24px 18px 32px;
+  border-radius: 16px;
+  background:
+    radial-gradient(120% 90% at 50% 0%, rgba(45, 190, 110, 0.10), transparent 70%),
+    var(--bg-surface, #12201a);
+  border: 1px solid var(--border, #1f3b2c);
+  overflow: hidden;
+}
+
+.simu-scene__bloc {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  /* Au-dessus du câble, qui traverse la scène en position absolue. */
+  position: relative;
+  z-index: 2;
+}
+
+.simu-scene__image {
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 22px rgba(0, 0, 0, 0.45));
+}
+
+.simu-scene__borne .simu-scene__image { max-height: 260px; }
+.simu-scene__voiture .simu-scene__image { max-height: 190px; }
+
+.simu-scene__legende {
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-secondary, #9fb8a9);
+  text-align: center;
+}
+
+/* ---------------------------------------------------------------- Badge --- */
+
+.simu-badge {
+  width: 100%;
+  max-width: 190px;
+  border-radius: 10px;
+  transition: transform 320ms ease, filter 320ms ease;
+}
+
+/* Présentation : le badge avance vers la borne puis revient, une seule fois. */
+.simu-badge--presente {
+  animation: simu-badger 1400ms ease-in-out;
+}
+
+@keyframes simu-badger {
+  0%   { transform: translateX(0) scale(1); }
+  45%  { transform: translateX(-48%) scale(0.92) rotate(-6deg); }
+  60%  { transform: translateX(-48%) scale(0.92) rotate(-6deg); filter: brightness(1.6); }
+  100% { transform: translateX(0) scale(1); }
+}
+
+.simu-badge--valide {
+  filter: drop-shadow(0 0 14px rgba(45, 190, 110, 0.75));
+}
+
+/* ---------------------------------------------------------------- Câble --- */
+
+/* Tracé entre la borne et la voiture. Il occupe toute la scène et se dévoile
+   de gauche à droite : `stroke-dashoffset` anime le branchement sans avoir à
+   déplacer un élément. */
+.simu-cable {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+  pointer-events: none;
+}
+
+.simu-cable__trace {
+  fill: none;
+  stroke: #2dbe6e;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 1000;
+  stroke-dashoffset: 1000;
+  opacity: 0;
+  transition: opacity 200ms ease;
+}
+
+.simu-cable--branche .simu-cable__trace {
+  opacity: 1;
+  animation: simu-brancher 900ms ease-out forwards;
+}
+
+@keyframes simu-brancher {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Pendant la charge, un pointillé remonte le long du câble : l'énergie circule. */
+.simu-cable--charge .simu-cable__flux {
+  fill: none;
+  stroke: #7cf5b0;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 14 26;
+  animation: simu-flux 900ms linear infinite;
+}
+
+@keyframes simu-flux {
+  to { stroke-dashoffset: -40; }
+}
+
+/* --------------------------------------------------------------- Panneaux - */
+
+.simu-panneaux {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 16px;
+  margin-top: 20px;
+}
+
+.simu-ligne {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--border, #1f3b2c);
+  font-size: 13px;
+}
+
+.simu-ligne:last-child { border-bottom: 0; }
+
+.simu-ligne__cle { color: var(--text-secondary, #9fb8a9); }
+.simu-ligne__valeur { font-weight: 600; text-align: right; }
+
+/* Chronomètre : chasse fixe, sinon la largeur saute à chaque seconde. */
+.simu-chrono {
+  font-family: ui-monospace, "Courier New", monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: clamp(28px, 5vw, 40px);
+  font-weight: 700;
+  letter-spacing: 0.04em;
+}
+
+.simu-jauge {
+  height: 10px;
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.09);
+  overflow: hidden;
+  margin-top: 6px;
+}
+
+.simu-jauge__niveau {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #2dbe6e, #7cf5b0);
+  transition: width 600ms ease;
+}
+
+@media (max-width: 820px) {
+  .simu-scene {
+    grid-template-columns: 1fr;
+    gap: 22px;
+  }
+
+  /* Le tracé horizontal n'a plus de sens une fois les blocs empilés. */
+  .simu-cable { display: none; }
+}
+
+/* ------------------------------------------------------------- Étapes ----- */
+
+/* Fil conducteur du parcours OCPP : le client voit où il en est et ce qui
+   vient ensuite, sans avoir à lire les panneaux. */
+.simu-etapes {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+
+.simu-etape {
+  flex: 1 1 150px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: 1px solid var(--border, #1f3b2c);
+  background: rgba(255, 255, 255, 0.02);
+  font-size: 13px;
+  color: var(--text-secondary, #9fb8a9);
+  transition: border-color 260ms ease, color 260ms ease, background 260ms ease;
+}
+
+.simu-etape__puce {
+  flex: 0 0 24px;
+  height: 24px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.07);
+  color: inherit;
+}
+
+.simu-etape--faite {
+  color: #7cf5b0;
+  border-color: rgba(45, 190, 110, 0.4);
+}
+
+.simu-etape--faite .simu-etape__puce {
+  background: rgba(45, 190, 110, 0.22);
+}
+
+/* L'étape courante respire, pour attirer l'œil sur l'action à faire. */
+.simu-etape--active {
+  color: #eafff3;
+  border-color: #2dbe6e;
+  background: rgba(45, 190, 110, 0.12);
+  animation: simu-respire 1800ms ease-in-out infinite;
+}
+
+.simu-etape--active .simu-etape__puce {
+  background: #2dbe6e;
+  color: #06210f;
+}
+
+@keyframes simu-respire {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(45, 190, 110, 0.35); }
+  50%      { box-shadow: 0 0 0 6px rgba(45, 190, 110, 0); }
+}
+
+/* ------------------------------------------------------------- Journal ---- */
+
+/* Dialogue OCPP en clair : c'est lui qui rend le processus compréhensible
+   plutôt que magique. */
+.simu-journal {
+  max-height: 230px;
+  overflow-y: auto;
+  font-family: ui-monospace, "Courier New", monospace;
+  font-size: 12px;
+}
+
+.simu-journal__ligne {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  animation: simu-apparait 300ms ease-out;
+}
+
+@keyframes simu-apparait {
+  from { opacity: 0; transform: translateY(-4px); }
+  to   { opacity: 1; transform: none; }
+}
+
+.simu-journal__heure { color: var(--text-muted, #6f8a7b); }
+
+.simu-journal__sens {
+  flex: 0 0 auto;
+  font-weight: 700;
+}
+
+.simu-journal__sens--envoi { color: #6fb3ff; }
+.simu-journal__sens--reception { color: #7cf5b0; }
+
+.simu-journal__action { font-weight: 600; }
+
+.simu-journal__charge {
+  color: var(--text-muted, #6f8a7b);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* --------------------------------------------------------- Scène animée --- */
+
+/* Halo vert sous la borne pendant la charge : l'état est lisible d'un coup
+   d'œil, même sans lire l'étiquette. */
+.simu-scene--charge .simu-scene__borne::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 -14px 0;
+  height: 26px;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(45, 190, 110, 0.55), transparent);
+  animation: simu-halo 1800ms ease-in-out infinite;
+}
+
+@keyframes simu-halo {
+  0%, 100% { opacity: 0.35; transform: scaleX(0.8); }
+  50%      { opacity: 0.9; transform: scaleX(1.1); }
+}
+
+/* La voiture s'enfonce très légèrement une fois branchée : le mouvement
+   signale la connexion sans texte. */
+.simu-scene__voiture .simu-scene__image {
+  transition: transform 600ms ease;
+}
+
+.simu-scene--branche .simu-scene__voiture .simu-scene__image {
+  transform: translateX(-8px);
+}
+
+.simu-jauge__niveau {
+  position: relative;
+  overflow: hidden;
+}
+
+/* Reflet qui balaie la jauge tant que l'énergie entre. */
+.simu-jauge__niveau--actif::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent,
+    rgba(255, 255, 255, 0.45),
+    transparent
+  );
+  animation: simu-reflet 1600ms linear infinite;
+}
+
+@keyframes simu-reflet {
+  from { transform: translateX(-100%); }
+  to   { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .simu-etape--active,
+  .simu-scene--charge .simu-scene__borne::after,
+  .simu-jauge__niveau--actif::after,
+  .simu-cable--charge .simu-cable__flux,
+  .simu-badge--presente {
+    animation: none;
+  }
+}
