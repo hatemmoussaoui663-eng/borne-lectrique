@@ -344,3 +344,9 @@
     animation: none;
   }
 }
+
+/* Solde qui ne couvre plus le coût en cours : la facture restera impayée à la
+   clôture, autant le signaler pendant la charge. */
+.simu-ligne__valeur--alerte {
+  color: #ff7875;
+}

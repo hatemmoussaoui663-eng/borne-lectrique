@@ -2,8 +2,6 @@
 
 namespace App\Support;
 
-use App\Models\Facture;
-use App\Models\Paiement;
 use App\Models\PaiementCarte;
 use App\Models\User;
 use App\Models\Wallet;
@@ -77,30 +75,14 @@ class PasserelleCarteSimulee
     }
 
     /**
-     * Solde les factures impayées tant que le porte-monnaie le permet, de la
-     * plus ancienne à la plus récente.
+     * Solde les factures impayées après un rechargement.
+     *
+     * La règle vit dans PaiementService : la clôture d'une session de charge
+     * s'en sert aussi, et deux copies auraient fini par diverger.
      */
     public function reglerFacturesEnAttente(User $client): int
     {
-        $reglees = 0;
-
-        $impayees = Facture::where('user_id', $client->id)
-            ->where('statut', Facture::STATUT_IMPAYEE)
-            ->orderBy('id')
-            ->get();
-
-        foreach ($impayees as $facture) {
-            // Le solde est relu à chaque tour : il vient de baisser du montant
-            // de la facture précédente.
-            if (Wallet::pour($client)->fresh()->solde < $facture->montant_ttc) {
-                break;
-            }
-
-            $this->paiements->regler($facture, Paiement::MOYEN_WALLET);
-            $reglees++;
-        }
-
-        return $reglees;
+        return $this->paiements->reglerFacturesEnAttente($client);
     }
 
     /**

@@ -7,7 +7,7 @@ import {
   StopOutlined,
   CheckCircleOutlined,
 } from '@ant-design/icons'
-import imageBorne from '../../assets/Borne-de-recharge-e-premium.jpg'
+import imageBorne from '../../assets/Borne-de-recharge-e-premium.png'
 import imageBadge from '../../assets/badge.png'
 import imageVoiture from '../../assets/image 1.png'
 import { getContexteSimulateur } from '../../api/simulateur'
@@ -55,11 +55,22 @@ function resume(charge: unknown): string {
   return texte.length > 90 ? `${texte.slice(0, 90)}…` : texte
 }
 
-function Ligne({ cle, valeur }: { cle: string; valeur: React.ReactNode }) {
+function Ligne({
+  cle,
+  valeur,
+  alerte = false,
+}: {
+  cle: string
+  valeur: React.ReactNode
+  /** Met la valeur en évidence — un solde qui ne couvre plus la charge. */
+  alerte?: boolean
+}) {
   return (
     <div className="simu-ligne">
       <span className="simu-ligne__cle">{cle}</span>
-      <span className="simu-ligne__valeur">{valeur}</span>
+      <span className={`simu-ligne__valeur${alerte ? ' simu-ligne__valeur--alerte' : ''}`}>
+        {valeur}
+      </span>
     </div>
   )
 }
@@ -110,6 +121,14 @@ function Simulateur() {
   const pleine = energieMaxKwh > 0 && energieKwh >= energieMaxKwh - 1e-9
   const coutHt = energieKwh * prixKwh
   const coutTtc = coutHt * (1 + tvaTaux / 100)
+
+  // Porte-monnaie prépayé : le serveur ne débite qu'à la clôture, mais laisser
+  // le solde figé pendant toute la charge donnerait l'impression qu'elle est
+  // gratuite. On affiche donc la projection tant que la session tourne, puis
+  // la valeur relue côté serveur une fois la facture réglée.
+  const soldeProjete = Math.max(0, (contexte?.solde ?? 0) - coutTtc)
+  const soldeAffiche = etape === 'charge' ? soldeProjete : (contexte?.solde ?? 0)
+  const soldeInsuffisant = (contexte?.solde ?? 0) < coutTtc
 
   /* ------------------------------------------------ chargement du contexte - */
 
@@ -307,7 +326,18 @@ function Simulateur() {
         errorCode: 'NoError',
       })
       setEtape('termine')
-      message.success('Session clôturée. Une facture a été émise.')
+
+      // Le débit du porte-monnaie se fait côté serveur, à l'émission de la
+      // facture : on relit le contexte pour afficher le solde réel plutôt que
+      // la projection tenue pendant la charge.
+      const frais = await getContexteSimulateur().catch(() => null)
+      if (frais) setContexte(frais)
+
+      message.success(
+        frais && frais.solde < (contexte?.solde ?? 0)
+          ? 'Session clôturée. Facture réglée sur votre porte-monnaie.'
+          : 'Session clôturée. Une facture a été émise.',
+      )
     } catch (e) {
       setErreur(e instanceof Error ? e.message : 'Arrêt impossible.')
     } finally {
@@ -426,6 +456,8 @@ function Simulateur() {
           <path className="simu-cable__trace" d={TRACE_CABLE} />
           {enCharge && <path className="simu-cable__flux" d={TRACE_CABLE} />}
         </svg>
+
+
 
         <div className="simu-scene__bloc simu-scene__borne">
           <img className="simu-scene__image" src={imageBorne} alt="Borne de recharge" />
@@ -554,7 +586,11 @@ function Simulateur() {
           <Ligne cle="Nom et prénom" valeur={contexte?.client.nom ?? '—'} />
           <Ligne cle="Identifiant client" valeur={contexte?.client.id ?? '—'} />
           <Ligne cle="Badge RFID" valeur={contexte?.badge?.code ?? 'Aucun'} />
-          <Ligne cle="Solde disponible" valeur={`${(contexte?.solde ?? 0).toFixed(3)} DT`} />
+          <Ligne
+            cle="Solde disponible"
+            valeur={`${soldeAffiche.toFixed(3)} DT`}
+            alerte={etape === 'charge' && soldeInsuffisant}
+          />
         </Card>
 
         <Card size="small" title="Véhicule">

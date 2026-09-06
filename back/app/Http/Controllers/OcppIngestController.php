@@ -13,6 +13,7 @@ use App\Models\FirmwareDeployment;
 use App\Models\Tarif;
 use App\Models\Vehicule;
 use App\Support\FacturationService;
+use App\Support\PaiementService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
@@ -183,7 +184,15 @@ class OcppIngestController extends Controller
         // — la borne resterait alors bloquée sur une transaction ouverte. Les
         // sessions manquées se rattrapent via POST /api/factures/generer.
         try {
-            app(FacturationService::class)->emettrePourSession($session);
+            $facture = app(FacturationService::class)->emettrePourSession($session);
+
+            // Porte-monnaie prépayé : la recharge se déduit du solde dès la
+            // clôture. Si le solde ne couvre pas la facture, elle reste
+            // impayée et sera soldée au prochain rechargement par carte —
+            // clôturer la session prime sur l'encaissement.
+            if ($facture !== null) {
+                app(PaiementService::class)->reglerDepuisWalletSiPossible($facture);
+            }
         } catch (Throwable $e) {
             Log::error("Facturation de la session {$session->id} impossible : {$e->getMessage()}");
         }

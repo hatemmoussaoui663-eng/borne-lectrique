@@ -72,6 +72,54 @@ class PaiementService
      *
      * @throws RuntimeException si le paiement n'est pas remboursable
      */
+    /**
+     * Règle une facture sur le porte-monnaie, mais seulement si le solde y
+     * suffit.
+     *
+     * Sert la recharge prépayée : une session close débite aussitôt le
+     * porte-monnaie du client. Le silence en cas de solde insuffisant est
+     * volontaire — la facture reste alors impayée et sera soldée au prochain
+     * rechargement, plutôt que de faire échouer la clôture de session.
+     */
+    public function reglerDepuisWalletSiPossible(Facture $facture): ?Paiement
+    {
+        if ($facture->statut !== Facture::STATUT_IMPAYEE || $facture->user === null) {
+            return null;
+        }
+
+        if (Wallet::pour($facture->user)->fresh()->solde < (float) $facture->montant_ttc) {
+            return null;
+        }
+
+        return $this->regler($facture, Paiement::MOYEN_WALLET);
+    }
+
+    /**
+     * Solde les factures impayées d'un client, de la plus ancienne à la plus
+     * récente, tant que le porte-monnaie le permet.
+     */
+    public function reglerFacturesEnAttente(User $client): int
+    {
+        $reglees = 0;
+
+        $impayees = Facture::where('user_id', $client->id)
+            ->where('statut', Facture::STATUT_IMPAYEE)
+            ->orderBy('id')
+            ->get();
+
+        foreach ($impayees as $facture) {
+            // Le solde est relu à chaque tour par reglerDepuisWalletSiPossible :
+            // il vient de baisser du montant de la facture précédente.
+            if ($this->reglerDepuisWalletSiPossible($facture) === null) {
+                break;
+            }
+
+            $reglees++;
+        }
+
+        return $reglees;
+    }
+
     public function rembourser(Paiement $paiement, string $motif): Paiement
     {
         if ($paiement->statut !== Paiement::STATUT_PAYE) {
